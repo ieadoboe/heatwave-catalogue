@@ -20,4 +20,4 @@ hwcat = "hwcat.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-hwcat = ["data/*.npz", "data/*.json"]
+hwcat = ["data/*.npz", "data/*.json", "viewer.html"]
