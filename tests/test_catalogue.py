@@ -37,6 +37,16 @@ def test_missing_era5_names_the_download_command():
             raise AssertionError("expected FileNotFoundError")
 
 
+def test_missing_era5_hint_keeps_the_region():
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            C.run(1999, Workdir(Path(d), region="usa"))
+        except FileNotFoundError as e:
+            assert "--region-name usa" in str(e) and "--region" in str(e), e
+        else:
+            raise AssertionError("expected FileNotFoundError")
+
+
 def test_even_window_refused():
     with tempfile.TemporaryDirectory() as d:
         try:
@@ -83,6 +93,7 @@ def test_matches_reference_2003():
 if __name__ == "__main__":
     test_layout()
     test_missing_era5_names_the_download_command()
+    test_missing_era5_hint_keeps_the_region()
     test_even_window_refused()
     test_all_ocean_box_gives_empty_catalogue()
     test_matches_reference_2003()

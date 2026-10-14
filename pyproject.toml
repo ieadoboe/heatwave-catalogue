@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwcat"
-version = "0.1.0"
+version = "0.1.1"
 description = "Gridded heat-wave catalogues from ERA5 (CTX90pct) and a check of how their rankings depend on the detector's settings"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

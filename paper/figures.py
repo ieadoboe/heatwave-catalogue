@@ -43,41 +43,6 @@ cmap = plt.get_cmap("inferno_r")
 print(f"{len(events)} events, {events.start.min():%d %b} to {events.end.max():%d %b}")
 
 # ----------------------------------------------------------------------
-# centroid countries
-# ----------------------------------------------------------------------
-# Country of the CENTROID, read off the coordinates by hand: there is no
-# country dataset in the repo and no offline geocoder in the .venv, and a
-# lookup this size beats adding a dependency for one column. Grouped by
-# country so the per-country counts are readable.
-#
-# It labels the balance point, not the extent. Events 1 to 4 each stretch more
-# than 1,000 km from centroid to hottest cell and span several countries, so
-# read this column as "where the event sat", never as "the country's heat wave".
-CENTROID_COUNTRY = {rank: country for country, ranks in {
-    "Russia":   (7, 8, 11, 18, 19, 21, 24, 28, 30, 38),
-    "France":   (2, 3, 4, 6, 34),
-    "UK":       (10, 12, 14, 17, 35),
-    "Algeria":  (9, 15, 32),
-    "Spain":    (13, 33, 37),
-    "Turkey":   (25, 27, 31),
-    "Ireland":  (20, 22),
-    "Sweden":   (16, 36),
-    "Bulgaria": (39,),
-    "Germany":  (1,),
-    "Greece":   (23,),
-    "Italy":    (5,),
-    "Norway":   (29,),
-    "Portugal": (26,),
-}.items() for rank in ranks}
-
-glance = events.assign(country=events["rank"].map(CENTROID_COUNTRY))[
-    ["rank", "country", "zone", "koppen", "duration_days", "severity_C_km2_day", "mean_anom_C", "peak_tmax_C",
-     "peak_tmax_lat", "peak_tmax_lon", "max_anom_C", "mean_anom_C"]]
-
-assert glance.country.notna().all(), "a rank is missing from CENTROID_COUNTRY"
-# print(glance.to_string(index=False))
-
-# ----------------------------------------------------------------------
 # detection on the 2026 grid
 # ----------------------------------------------------------------------
 # The threshold the 2026 catalogue was made with (April-October, 15 days,

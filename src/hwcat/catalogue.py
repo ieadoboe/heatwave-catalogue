@@ -91,6 +91,15 @@ def save_labels_npz(det, events, path: Path) -> None:
         path)
 
 
+def download_hint(workdir: Workdir, years: str) -> str:
+    """The hwcat download command that fetches what is missing, keeping a
+    non-European region's name and asking for its box."""
+    hint = f"hwcat download --years {years} --workdir {workdir.root}"
+    if workdir.region != "europe":
+        hint += f" --region-name {workdir.region} --region N W S E"
+    return hint
+
+
 def run(year: int, workdir: Workdir, percentile: float = 0.90,
         min_days: int = 3, min_area: float = 50_000.0, window: int = 15,
         leave_one_out: bool = False, save_labels: bool = False,
@@ -107,8 +116,7 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
     target_path = workdir.era5_file(year)
     if not target_path.exists():
         raise FileNotFoundError(
-            f"missing {target_path}\nrun: hwcat download --years {year} "
-            f"--workdir {workdir.root}")
+            f"missing {target_path}\nrun: {download_hint(workdir, str(year))}")
 
     print(f"Target year {year}: {target_path.name}")
     target = D.open_daily_tmax([target_path])
@@ -129,8 +137,8 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
         if missing:
             raise FileNotFoundError(
                 f"missing {len(missing)} baseline year(s): "
-                f"{', '.join(missing[:5])}\nrun: hwcat download --years "
-                f"{first}-{last} --workdir {workdir.root}")
+                f"{', '.join(missing[:5])}\n"
+                f"run: {download_hint(workdir, f'{first}-{last}')}")
         baseline_da = D.open_daily_tmax(paths)
         threshold = D.calendar_day_percentile(baseline_da, q=percentile,
                                               window=window // 2)

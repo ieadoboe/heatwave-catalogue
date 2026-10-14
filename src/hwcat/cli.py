@@ -19,7 +19,8 @@ def parse_years(tokens: list[str]) -> list[int]:
             years += list(range(a, b + 1))
         else:
             years.append(int(t))
-    return years
+    # A year named twice (2003 inside 1991-2020) must be fetched once.
+    return sorted(set(years))
 
 
 def parse_region(values: list[float]) -> list[float]:
@@ -43,8 +44,9 @@ def main(argv: list[str] | None = None) -> None:
     d = sub.add_parser("download", help="ERA5 daily maxima for a region")
     _common(d)
     d.add_argument("--years", nargs="+", required=True)
-    d.add_argument("--region", nargs=4, type=float, default=EUROPE,
-                   metavar=("N", "W", "S", "E"))
+    d.add_argument("--region", nargs=4, type=float, default=None,
+                   metavar=("N", "W", "S", "E"),
+                   help="Box in degrees (default: Europe, 72 -25 35 45)")
     d.add_argument("--overwrite", action="store_true")
 
     t = sub.add_parser("detect", help="One catalogue for one year")
@@ -69,9 +71,12 @@ def main(argv: list[str] | None = None) -> None:
     wd = Workdir(a.workdir, region=a.region_name)
     try:
         if a.command == "download":
+            if a.region is None and a.region_name != "europe":
+                raise ValueError(f"--region-name {a.region_name} needs its "
+                                 f"box: add --region N W S E")
+            region = parse_region(a.region if a.region is not None else EUROPE)
             from hwcat.download import download
-            download(parse_years(a.years), wd, parse_region(a.region),
-                     overwrite=a.overwrite)
+            download(parse_years(a.years), wd, region, overwrite=a.overwrite)
         elif a.command == "detect":
             from hwcat.catalogue import run
             run(a.year, wd, percentile=a.percentile, min_days=a.min_days,
