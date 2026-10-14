@@ -505,9 +505,9 @@ cb = fig.colorbar(im, ax=axes, fraction=0.03, pad=0.03)
 cb.set_label("places moved", fontsize=9)   # magnitude; the
 # printed sign carries direction, because the claim is that an
 # event moved at all, not which way.
-fig.suptitle("2003 and 2022 reorder only their 4th to 6th events, and only at "
-             "the 95th percentile.\nIn 2026 the reordering reaches rank 2 and "
-             "happens at both.\n"
+fig.suptitle("At the 95th percentile the August 2003 wave drops to second; "
+             "2022 reorders only its 6th event.\nIn 2026 the reordering reaches "
+             "rank 2 and happens at both percentiles.\n"
              "(blank = unchanged; a positive number means the event moved UP "
              "the ranking;\nblue ties reference events that this setting "
              "detects as a single event;\ncolumn heads are the minimum patch "

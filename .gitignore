@@ -11,3 +11,4 @@ paper/*.fls
 paper/*.log
 paper/*.out
 paper/catalogue_paper.pdf
+paper-run/
