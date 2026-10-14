@@ -1,40 +1,12 @@
-"""Pair the events of two catalogue runs: by dates and centroids (fast, used
-by the 3-summer sweep) or by shared cell-days (exact, used everywhere else)."""
+"""Pair the events of two catalogue runs by the cell-days they share.
+
+Matching by dates and centroids was dropped on 2026-10-14: it reported a
+small event that vanished as having merged into a big neighbour."""
 
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-
-def match_events(ref: pd.DataFrame, run: pd.DataFrame,
-                 max_dist_deg: float = 10.0) -> pd.Series:
-    """For each reference event, the index in `run` of its counterpart, or -1.
-
-    A counterpart must overlap the reference in time. Among those, the one
-    with the most overlapping days wins, nearest centroid as tie-break, and
-    it must lie within max_dist_deg of the reference centroid. Frames must
-    carry start, end, centroid_lat and centroid_lon; dates as datetimes.
-
-    ponytail: date-plus-centroid matching, not cell-day overlap, so a run
-    that splits one reference event into two reports only the larger half.
-    Swap in overlap of the label grids if that ever decides a result."""
-    out = []
-    for _, e in ref.iterrows():
-        overlap = ((np.minimum(run.end, e.end) - np.maximum(run.start, e.start))
-                   .dt.days + 1).clip(lower=0)
-        dlat = run.centroid_lat - e.centroid_lat
-        dlon = (run.centroid_lon - e.centroid_lon) * np.cos(np.radians(e.centroid_lat))
-        dist = np.hypot(dlat, dlon)
-        ok = (overlap > 0) & (dist <= max_dist_deg)
-        if not ok.any():
-            out.append(-1)
-            continue
-        score = pd.DataFrame({"overlap": overlap[ok], "dist": dist[ok]})
-        best = score.sort_values(["overlap", "dist"],
-                                 ascending=[False, True]).index[0]
-        out.append(int(best))
-    return pd.Series(out, index=ref.index)
 
 
 def footprint(path: Path) -> pd.DataFrame:

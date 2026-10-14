@@ -31,7 +31,6 @@ import numpy as np
 import pandas as pd
 
 from hwcat.match import footprint, match_by_overlap
-from hwcat.sensitivity import tag_for as _area_pct_tag
 from hwcat.workdir import Workdir
 
 AREAS_KM2 = (25_000, 50_000, 100_000)
@@ -45,7 +44,7 @@ DATES = ["start", "peak", "end"]
 
 
 def tag_for(area_km2: float, pct: float, window: int) -> str:
-    return _area_pct_tag(area_km2, pct) + f"_w{window}"
+    return f"_a{int(area_km2 / 1000)}k_p{int(round(pct * 100))}_w{window}"
 
 
 
@@ -53,10 +52,52 @@ def tag_for(area_km2: float, pct: float, window: int) -> str:
 
 
 def per_year_table(workdir: Workdir, year: int) -> Path:
-    """Per setting, per top event, for one summer. Named apart from the
-    3-summer sweep's catalogue_sensitivity_<region>_<year>.csv, which shares
-    the folder."""
+    """Per setting, per top event, for one summer. Named apart from
+    paper_table's catalogue_sensitivity_<region>_<year>.csv, which shares the
+    folder."""
     return workdir.robustness / f"stability_{workdir.region}_{year}.csv"
+
+
+def paper_table(year: int, workdir: Workdir, top: int = 6,
+                window: int = 15) -> pd.DataFrame:
+    """The table behind paper Figure 4: the reference top events under each
+    minimum area and percentile at one window, matched by shared cell-days,
+    leave-one-out like every run here. Two reference events matched to the
+    same new event share a new rank, which is how the figure marks a merge.
+
+    Written to <workdir>/robustness/catalogue_sensitivity_<region>_<year>.csv."""
+    def load(area, pct):
+        tag = tag_for(area, pct, window)
+        run = pd.read_csv(workdir.catalogue_file(year, tag))
+        for col in DATES:
+            run[col] = pd.to_datetime(run[col])
+        return run, footprint(workdir.labels_file(year, tag))
+
+    ref_all, ref_fp = load(*REFERENCE[:2])
+    ref = ref_all.head(top)
+    rows = []
+    for pct in PERCENTILES:
+        for area in AREAS_KM2:
+            run, run_fp = load(area, pct)
+            m = match_by_overlap(ref_all, ref_fp, run, run_fp).iloc[:len(ref)]
+            for (_, e), j in zip(ref.iterrows(), m.run_index):
+                hit = run.iloc[j] if j >= 0 else None
+                rows.append({
+                    "min_area_km2": area, "percentile": pct, "n_events": len(run),
+                    "ref_rank": int(e["rank"]), "survives": j >= 0,
+                    "rank": int(hit["rank"]) if hit is not None else np.nan,
+                    "start": hit.start.date() if hit is not None else pd.NaT,
+                    "end": hit.end.date() if hit is not None else pd.NaT,
+                    "duration_days": hit.duration_days if hit is not None else np.nan,
+                    "peak_area_km2": hit.peak_area_km2 if hit is not None else np.nan,
+                    "severity_C_km2_day": (hit.severity_C_km2_day
+                                           if hit is not None else np.nan),
+                })
+    table = pd.DataFrame(rows)
+    workdir.robustness.mkdir(parents=True, exist_ok=True)
+    table.to_csv(workdir.robustness /
+                 f"catalogue_sensitivity_{workdir.region}_{year}.csv", index=False)
+    return table
 
 
 def changed_parameter(area, pct, window) -> str | None:
@@ -243,6 +284,7 @@ def sweep(years: list[int], workdir: Workdir, top: int = 6, jobs: int = 3,
         if not summary:
             print(f"{year}: no reference catalogue, skipped")
             continue
+        paper_table(year, workdir, top)
         table.to_csv(per_year_table(workdir, year),
                      index=False)
         tables.append(table)

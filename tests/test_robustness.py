@@ -128,17 +128,48 @@ def test_restart_skips_finished_settings():
     assert calls == [], calls
 
 
-def test_sweep_table_does_not_collide_with_sensitivity():
-    """The all-summers per-year table and the 3-summer sweep's table share a
-    folder; they must not share a file name."""
+def test_paper_table():
+    """The 3-summer table behind paper Figure 4: same columns as before,
+    15-day window only, shared-cell matching, merges as a shared new rank."""
     import tempfile
-    from hwcat import sensitivity
+    import numpy as np
+    shape = np.array([10, 5, 5])
+    cols = ["rank", "event_id", "start", "peak", "end", "duration_days",
+            "peak_area_km2", "severity_C_km2_day", "centroid_lat", "centroid_lon"]
+    ref = pd.DataFrame([[1, 1, "2003-07-29", "2003-08-10", "2003-08-15", 18, 9e5, 5e7, 46.0, 4.0],
+                        [2, 2, "2003-07-20", "2003-07-25", "2003-07-28", 9, 4e5, 2e7, 47.0, 6.0]],
+                       columns=cols)
+    joint = pd.DataFrame([[1, 7, "2003-07-20", "2003-08-10", "2003-08-15", 27, 1.3e6, 7e7, 46.5, 5.0]],
+                         columns=cols)
+
+    def save(path, ids, cells):
+        t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(shape))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(path, t=t, i=i, j=j,
+                            event_id=np.asarray(ids, dtype=np.int32), shape=shape)
+
     with tempfile.TemporaryDirectory() as d:
         w = Workdir(Path(d))
-        names = AY.per_year_table(w, 2003).name, \
-            (w.robustness / f"catalogue_sensitivity_{w.region}_2003.csv").name
-    assert names[0] != names[1], names
-    assert names[0] == "stability_europe_2003.csv", names
+        w.catalogues.mkdir(parents=True)
+        for area, pct, window in AY.product(AY.AREAS_KM2, AY.PERCENTILES, AY.WINDOWS):
+            tag = AY.tag_for(area, pct, window)
+            if (area, pct, window) == (25_000, 0.90, 15):      # joins 1 and 2
+                joint.to_csv(w.catalogue_file(2003, tag), index=False)
+                save(w.labels_file(2003, tag), [7] * 8, list(range(8)))
+            else:
+                ref.to_csv(w.catalogue_file(2003, tag), index=False)
+                save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, list(range(8)))
+        table = AY.paper_table(2003, w)
+        written = w.robustness / "catalogue_sensitivity_europe_2003.csv"
+        assert written.exists(), written
+    assert list(table.columns) == ["min_area_km2", "percentile", "n_events",
+                                   "ref_rank", "survives", "rank", "start", "end",
+                                   "duration_days", "peak_area_km2",
+                                   "severity_C_km2_day"], list(table.columns)
+    assert len(table) == 2 * 6, len(table)       # 2 events x 6 settings, window 15 only
+    merged = table[(table.min_area_km2 == 25_000) & (table.percentile == 0.90)]
+    assert list(merged["rank"]) == [1, 1], merged   # two references, one new event
+    assert merged.survives.all()
 
 
 if __name__ == "__main__":
@@ -147,7 +178,7 @@ if __name__ == "__main__":
     test_names_never_collide()
     test_empty_setting()
     test_restart_skips_finished_settings()
-    test_sweep_table_does_not_collide_with_sensitivity()
+    test_paper_table()
     test_changed_parameter()
     test_crowding()
     print("ok")
