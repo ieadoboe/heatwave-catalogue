@@ -8,7 +8,7 @@ Writes to paper/figures/:
     detector_threshold_berlin step 1: how the bar for 27 June is set in Berlin
     detector_step_area        step 3: 20 June, small hot patches deleted
     detector_step_persist     step 4: Warsaw, short spells dropped
-    detector_step_label       step 5: event 1 every four days
+    detector_step_label       step 5: event 1 on six days in a row
 
 The panels run the hwcat.detect functions in the order detect() runs them,
 and two asserts tie the figures to the code: the step-by-step masks must equal
@@ -84,8 +84,9 @@ Q = 0.90
 # steps 3-5 figures
 STEP4_CITY = ("Warsaw", 52.2, 21.0)
 SPAN = ("2026-06-05", "2026-07-05")
-LABEL_DAYS = ["2026-06-12", "2026-06-16", "2026-06-20",
-              "2026-06-24", "2026-06-28", "2026-07-02"]
+# Consecutive days, so each map overlaps the one before it: event #1 fades
+# east to its end while event #4 forms over Iberia, never touching it.
+LABEL_DAYS = pd.date_range("2026-06-28", "2026-07-03").strftime("%Y-%m-%d")
 BG = "#F7F4EE"         # the deck's slide background
 
 
@@ -591,12 +592,19 @@ def label_figure(r):
         state = np.where(np.isin(lab, events.index), 3, state)  # catalogued
         state = np.where(lab == top, 4, state)
         draw_map(ax, state, [SEA, LAND, "#BDB6AB", TUNE, HOT], r)
+        # Yesterday's outline of event #1: the overlap that joins the days.
+        before = r["labels"][k - 1] == top
+        if before.any():
+            ax.contour(r["lon"], r["lat"], before.astype(float), levels=[0.5],
+                       colors=INK, linewidths=0.7, linestyles=[(0, (2, 1.2))])
         ax.set_title(pd.Timestamp(day).strftime("%-d %b"), fontsize=9,
                      color=INK, pad=2)
     fig.legend(handles=[Patch(fc=HOT, label=r"event \#1"),
+                        Line2D([], [], color=INK, lw=0.7, ls=(0, (2, 1.2)),
+                               label="its day before"),
                         Patch(fc=TUNE, label="other events"),
-                        Patch(fc="#BDB6AB", label="too small to count")],
-               loc="lower center", ncol=3, frameon=False, fontsize=8.5,
+                        Patch(fc="#BDB6AB", label="too small")],
+               loc="lower center", ncol=4, frameon=False, fontsize=8.5,
                handlelength=1.2)
     fig.subplots_adjust(left=0.01, right=0.99, top=0.95, bottom=0.1,
                         wspace=0.04, hspace=0.14)
