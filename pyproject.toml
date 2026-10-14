@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Gridded heat-wave catalogues from ERA5 (CTX90pct) and a check of how their rankings depend on the detector's settings"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-dependencies = ["numpy", "pandas", "xarray", "scipy", "netCDF4", "matplotlib"]
+dependencies = ["numpy", "pandas", "xarray", "dask", "scipy", "netCDF4", "matplotlib"]
 
 [project.optional-dependencies]
 download = ["cdsapi"]
