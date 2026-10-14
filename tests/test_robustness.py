@@ -128,12 +128,26 @@ def test_restart_skips_finished_settings():
     assert calls == [], calls
 
 
+def test_sweep_table_does_not_collide_with_sensitivity():
+    """The all-summers per-year table and the 3-summer sweep's table share a
+    folder; they must not share a file name."""
+    import tempfile
+    from hwcat import sensitivity
+    with tempfile.TemporaryDirectory() as d:
+        w = Workdir(Path(d))
+        names = AY.per_year_table(w, 2003).name, \
+            (w.robustness / f"catalogue_sensitivity_{w.region}_2003.csv").name
+    assert names[0] != names[1], names
+    assert names[0] == "stability_europe_2003.csv", names
+
+
 if __name__ == "__main__":
     test_leave_one_out()
     test_threshold_name()
     test_names_never_collide()
     test_empty_setting()
     test_restart_skips_finished_settings()
+    test_sweep_table_does_not_collide_with_sensitivity()
     test_changed_parameter()
     test_crowding()
     print("ok")

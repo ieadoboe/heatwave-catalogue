@@ -15,7 +15,7 @@ Leave-one-out thresholds are about 36 MB each and only one summer uses them,
 so each is deleted once that summer's runs finish.
 
 Outputs, under <workdir>/robustness/:
-  catalogue_sensitivity_<region>_<year>.csv   per setting, per top event
+  stability_<region>_<year>.csv               per setting, per top event
   catalogue_stability_allyears.csv            one row per summer
   (merge_settings counts settings in which two reference events became one)
   catalogue_stability_allyears.pdf
@@ -50,6 +50,13 @@ def tag_for(area_km2: float, pct: float, window: int) -> str:
 
 
 
+
+
+def per_year_table(workdir: Workdir, year: int) -> Path:
+    """Per setting, per top event, for one summer. Named apart from the
+    3-summer sweep's catalogue_sensitivity_<region>_<year>.csv, which shares
+    the folder."""
+    return workdir.robustness / f"stability_{workdir.region}_{year}.csv"
 
 
 def changed_parameter(area, pct, window) -> str | None:
@@ -236,7 +243,7 @@ def sweep(years: list[int], workdir: Workdir, top: int = 6, jobs: int = 3,
         if not summary:
             print(f"{year}: no reference catalogue, skipped")
             continue
-        table.to_csv(workdir.robustness / f"catalogue_sensitivity_{workdir.region}_{year}.csv",
+        table.to_csv(per_year_table(workdir, year),
                      index=False)
         tables.append(table)
         rows.append(summary)
