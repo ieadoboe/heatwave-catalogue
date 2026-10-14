@@ -8,26 +8,13 @@ Covers the four things that can quietly go wrong: the 3-day persistence rule,
 the area filter, whether two separate blobs stay separate, and whether one
 drifting blob stays a single event.
 """
-import importlib.util
-import sys
-import types
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-# Import heatwave_ic.detect without executing the package __init__, which
-# pulls in jax and neuralgcm. Detection needs neither.
-REPO = Path(__file__).resolve().parents[1]
-pkg = types.ModuleType("heatwave_ic")
-pkg.__path__ = [str(REPO / "heatwave_ic")]
-sys.modules["heatwave_ic"] = pkg
-_spec = importlib.util.spec_from_file_location(
-    "heatwave_ic.detect", REPO / "heatwave_ic" / "detect.py")
-D = importlib.util.module_from_spec(_spec)
-sys.modules["heatwave_ic.detect"] = D
-_spec.loader.exec_module(D)
+from hwcat import detect as D
 
 rng = np.random.default_rng(0)
 LAT = np.arange(60, 40, -0.25)      # 80 cells, north to south like ERA5

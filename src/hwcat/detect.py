@@ -83,7 +83,7 @@ def land_mask_for(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
     """Land mask on an arbitrary lat/lon grid, from the Koppen map already in
     data/ (class 0 is ocean). Saves downloading a separate land-sea mask, and
     keeps ocean cells out of a land heat-wave catalogue."""
-    from heatwave_ic.zones import koppen_grid
+    from hwcat.zones import koppen_grid
 
     classes, klat, klon, _ = koppen_grid()
     i = np.abs(klat[:, None] - lat[None, :]).argmin(axis=0)

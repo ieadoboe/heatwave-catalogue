@@ -1,6 +1,6 @@
 """Köppen-Geiger climate-zone classification for events and grid points.
 
-Data: data/koppen_geiger_0p1_1991_2020.npz — the 0.1° (~11 km), 1991-2020
+Data: hwcat/data/koppen_geiger_0p1_1991_2020.npz — the 0.1° (~11 km), 1991-2020
 historical map from Beck et al. (2023), repackaged from koppen_geiger_tif.zip
 (figshare article 21789074) into a small npz (uint8 class grid + lat/lon
 axes + code legend; 0 = ocean/no data).
@@ -23,8 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-KOPPEN_NPZ = (Path(__file__).resolve().parents[1]
-              / "data" / "koppen_geiger_0p1_1991_2020.npz")
+KOPPEN_NPZ = Path(__file__).resolve().parent / "data" / "koppen_geiger_0p1_1991_2020.npz"
 
 #: Köppen main groups.
 GROUP_NAMES = {
