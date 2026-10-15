@@ -362,8 +362,14 @@ def plot_one_at_a_time(table: pd.DataFrame, top: int, path: Path) -> None:
                label=f"two top-{top} events merged")
         ticks = [f"{v / 1000:g}" if param == "min_area_km2" else f"{v:g}"
                  for v in d.index]
+        # Under LaTeX text, set_fontweight is ignored: bold has to be markup.
+        bold = (lambda s: rf"\textbf{{{s}}}") if plt.rcParams["text.usetex"] \
+            else (lambda s: s)
+        i_ref = list(d.index).index(ref[param])
+        ticks[i_ref] = bold(ticks[i_ref])
         ax.set_xticks(x, ticks)
-        ax.get_xticklabels()[list(d.index).index(ref[param])].set_fontweight("bold")
+        if not plt.rcParams["text.usetex"]:
+            ax.get_xticklabels()[i_ref].set_fontweight("bold")
         ax.set_xlabel(labels[param])
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     axes[0].set_ylabel(f"summers (of {n})")
