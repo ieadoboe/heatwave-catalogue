@@ -15,8 +15,9 @@ Leave-one-out thresholds are about 36 MB each and only one summer uses them,
 so each is deleted once that summer's runs finish.
 
 With --one-at-a-time it instead sweeps each setting across its full range
-(ONE_AT_A_TIME: area to 625k km2, window 7 to 31 days, minimum days 3 to 7)
-with the others at the reference.
+(ONE_AT_A_TIME: area to 625k km2, window 7 to 31 days, minimum days 3 to 7,
+and the windows again with the seasonal cycle removed) with the others at
+the reference.
 
 Outputs, under <workdir>/robustness/:
   stability_<region>_<year>.csv               per setting, per top event
@@ -44,32 +45,43 @@ WINDOWS = (7, 15, 31)
 REFERENCE = (50_000, 0.90, 15)
 BASELINE = (1991, 2020)
 DATES = ["start", "peak", "end"]
-GRID = [(a, p, w, 3) for a, p, w in product(AREAS_KM2, PERCENTILES, WINDOWS)]
+GRID = [(a, p, w, 3, False)
+        for a, p, w in product(AREAS_KM2, PERCENTILES, WINDOWS)]
+FULL_REFERENCE = (*REFERENCE, 3, False)   # area, pct, window, days, cycle removed
 
 # One setting at a time from the reference, each across its full range:
 # which value first moves the leader, not only whether some value does.
+# The last sweep repeats the windows with the seasonal cycle removed, to
+# tell a wide window's bias (Brunner and Voigt 2024) from a real choice.
 ONE_AT_A_TIME = {"min_area_km2": (25_000, 50_000, 100_000, 625_000),
                  "window_days": (7, 11, 15, 21, 31),
-                 "min_days": (3, 4, 5, 6, 7)}
+                 "min_days": (3, 4, 5, 6, 7),
+                 "window_cycle_removed": (7, 11, 15, 21, 31)}
 
 
 def one_at_a_time_settings() -> list[tuple[str, float, tuple]]:
-    """(parameter, value, setting) with setting = (area, pct, window, days)."""
-    ref = dict(zip(("min_area_km2", "percentile", "window_days", "min_days"),
-                   (*REFERENCE, 3)))
+    """(parameter, value, setting), setting as in FULL_REFERENCE."""
+    names = ("min_area_km2", "percentile", "window_days", "min_days",
+             "remove_cycle")
     out = []
     for param, values in ONE_AT_A_TIME.items():
         for v in values:
-            s = {**ref, param: v}
-            out.append((param, v, (s["min_area_km2"], s["percentile"],
-                                   s["window_days"], s["min_days"])))
+            s = dict(zip(names, FULL_REFERENCE))
+            if param == "window_cycle_removed":
+                s.update(window_days=v, remove_cycle=True)
+            else:
+                s[param] = v
+            out.append((param, v, tuple(s[n] for n in names)))
     return out
 
 
-def tag_for(area_km2: float, pct: float, window: int, min_days: int = 3) -> str:
-    """The default three days adds nothing, so the grid's files keep their names."""
+def tag_for(area_km2: float, pct: float, window: int, min_days: int = 3,
+            remove_cycle: bool = False) -> str:
+    """Defaults add nothing, so the grid's files keep their names."""
     tag = f"_a{int(area_km2 / 1000)}k_p{int(round(pct * 100))}_w{window}"
-    return tag if min_days == 3 else f"{tag}_d{min_days}"
+    if min_days != 3:
+        tag += f"_d{min_days}"
+    return tag + "_sc" if remove_cycle else tag
 
 
 
@@ -158,10 +170,10 @@ def crowding(top: pd.DataFrame, max_gap_days: int = 3,
 
 def run_year(year: int, workdir: Workdir, skip_runs: bool = False,
              settings: list[tuple] = GRID) -> None:
-    """Every setting (area, pct, window, days) for one summer, then drop its
+    """Every setting (as in FULL_REFERENCE) for one summer, then drop its
     leave-one-out thresholds."""
-    for area, pct, window, days in settings:
-        tag = tag_for(area, pct, window, days)
+    for area, pct, window, days, cycle in settings:
+        tag = tag_for(area, pct, window, days, cycle)
         done = (workdir.catalogue_file(year, tag).exists()
                 and workdir.labels_file(year, tag).exists())
         if skip_runs or done:
@@ -171,6 +183,7 @@ def run_year(year: int, workdir: Workdir, skip_runs: bool = False,
              "--min-area", str(area), "--percentile", str(pct),
              "--window", str(window), "--min-days", str(days),
              "--leave-one-out", "--no-plot",
+             *(["--remove-seasonal-cycle"] if cycle else []),
              "--save-labels", "--workdir", str(workdir.root),
              "--region-name", workdir.region, "--tag", tag],
             check=True, stdout=subprocess.DEVNULL)
@@ -312,7 +325,7 @@ def compare_one_at_a_time(year: int, workdir: Workdir, top: int) -> pd.DataFrame
         return (pd.read_csv(workdir.catalogue_file(year, tag)),
                 footprint(workdir.labels_file(year, tag)))
 
-    loaded = load((*REFERENCE, 3))
+    loaded = load(FULL_REFERENCE)
     if loaded is None or loaded[0].empty:
         return pd.DataFrame()
     ref_all, ref_fp = loaded
@@ -328,7 +341,7 @@ def compare_one_at_a_time(year: int, workdir: Workdir, top: int) -> pd.DataFrame
                         for j in m.run_index])
         old = ref["rank"].to_numpy()
         rows.append({"year": year, "parameter": param, "value": value,
-                     "is_reference": setting == (*REFERENCE, 3),
+                     "is_reference": setting == FULL_REFERENCE,
                      "n_events": len(run),
                      "leader_moved": bool(new[0] != 1),
                      "n_top_moved": int((new != old).sum()),
@@ -347,11 +360,15 @@ def plot_one_at_a_time(table: pd.DataFrame, top: int, path: Path) -> None:
     by = table.groupby(["parameter", "value"])[
         ["leader_moved", "top3_left_top", "top_merged"]].sum()
     labels = {"min_area_km2": r"minimum area (1000 km$^2$)",
-              "window_days": "window (days)", "min_days": "minimum days"}
+              "window_days": "window (days)", "min_days": "minimum days",
+              "window_cycle_removed": "window, cycle removed (days)"}
+    # The cycle-removed sweep has no reference value: every bar is a change.
     ref = {"min_area_km2": REFERENCE[0], "window_days": REFERENCE[2],
            "min_days": 3}
-    fig, axes = plt.subplots(1, 3, figsize=(11, 3.4), sharey=True)
-    for ax, param in zip(axes, ONE_AT_A_TIME):
+    params = [p for p in ONE_AT_A_TIME if p in by.index.get_level_values(0)]
+    fig, axes = plt.subplots(1, len(params), figsize=(3.7 * len(params), 3.4),
+                             sharey=True)
+    for ax, param in zip(axes, params):
         d = by.loc[param]
         x = np.arange(len(d))
         ax.bar(x - 0.27, d.leader_moved, 0.27, color="#B5470F",
@@ -365,10 +382,11 @@ def plot_one_at_a_time(table: pd.DataFrame, top: int, path: Path) -> None:
         # Under LaTeX text, set_fontweight is ignored: bold has to be markup.
         bold = (lambda s: rf"\textbf{{{s}}}") if plt.rcParams["text.usetex"] \
             else (lambda s: s)
-        i_ref = list(d.index).index(ref[param])
-        ticks[i_ref] = bold(ticks[i_ref])
+        i_ref = list(d.index).index(ref[param]) if param in ref else None
+        if i_ref is not None:
+            ticks[i_ref] = bold(ticks[i_ref])
         ax.set_xticks(x, ticks)
-        if not plt.rcParams["text.usetex"]:
+        if i_ref is not None and not plt.rcParams["text.usetex"]:
             ax.get_xticklabels()[i_ref].set_fontweight("bold")
         ax.set_xlabel(labels[param])
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))

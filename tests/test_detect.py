@@ -121,4 +121,29 @@ area = D.cell_area_km2(np.array([0.0, 60.0]), np.arange(0, 1, 0.25))
 ratio = area[1, 0] / area[0, 0]
 assert 0.49 < ratio < 0.51, ratio
 print(f"OK: a cell at 60N is {ratio:.2f} of the area of one at the equator.")
+
+# --- seasonal-cycle removal -------------------------------------------------
+# A steep ramp (0.2 C a day) under unit noise. Pooled raw, a 31-day window
+# mixes days up to 3 C apart and overshoots the true 90th percentile; with
+# the cycle removed it should land on it.
+doys = np.arange(91, 305)
+ramp_years = []
+for y in range(1991, 2021):
+    t = pd.Timestamp(f"{y}-01-01") + pd.to_timedelta(doys - 1, "D")
+    vals = (0.2 * (doys - 91))[:, None, None] + rng.normal(0, 1, (doys.size, 2, 2))
+    ramp_years.append(xr.DataArray(vals.astype("float32"),
+                                   coords={"time": t, "latitude": [1.0, 0.0],
+                                           "longitude": [0.0, 1.0]},
+                                   dims=("time", "latitude", "longitude")))
+ramp = xr.concat(ramp_years, dim="time")
+truth = 0.2 * (200 - 91) + 1.2816          # day 200: ramp + noise's 90th pct
+raw = float(D.calendar_day_percentile(ramp, 0.90, window=15)
+            .sel(dayofyear=200).mean())
+fixed = float(D.calendar_day_percentile(ramp, 0.90, window=15,
+                                        remove_cycle=True)
+              .sel(dayofyear=200).mean())
+assert raw - truth > 0.8, (raw, truth)
+assert abs(fixed - truth) < 0.2, (fixed, truth)
+print(f"OK: on a 0.2 C/day ramp the 31-day bar overshoots by {raw - truth:.2f} C "
+      f"raw and misses by {fixed - truth:+.2f} C with the cycle removed.")
 print("\nALL CHECKS PASSED")

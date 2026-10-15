@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> None:
     t.add_argument("--min-area", type=float, default=50_000.0)
     t.add_argument("--window", type=int, default=15)
     t.add_argument("--leave-one-out", action="store_true")
+    t.add_argument("--remove-seasonal-cycle", action="store_true",
+                   help="Subtract each day's normal before taking percentiles")
     t.add_argument("--save-labels", action="store_true")
     t.add_argument("--no-plot", action="store_true")
     t.add_argument("--tag", default=None)
@@ -85,7 +87,8 @@ def main(argv: list[str] | None = None) -> None:
             run(a.year, wd, percentile=a.percentile, min_days=a.min_days,
                 min_area=a.min_area, window=a.window,
                 leave_one_out=a.leave_one_out, save_labels=a.save_labels,
-                plot=not a.no_plot, tag=a.tag)
+                plot=not a.no_plot, tag=a.tag,
+                remove_cycle=a.remove_seasonal_cycle)
         else:
             from hwcat.robustness import one_at_a_time, sweep
             run = one_at_a_time if a.one_at_a_time else sweep

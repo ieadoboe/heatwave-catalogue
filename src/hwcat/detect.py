@@ -105,32 +105,55 @@ def cell_area_km2(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
     return np.repeat((height * width)[:, None], lon.size, axis=1)
 
 
+CYCLE_HALF_WIDTH = 15   # days either side: a 31-day running mean
+
+
 def calendar_day_percentile(baseline: xr.DataArray, q: float = 0.90,
-                            window: int = 7) -> xr.DataArray:
+                            window: int = 7,
+                            remove_cycle: bool = False) -> xr.DataArray:
     """Percentile threshold per calendar day, pooled over +/- `window` days.
 
     Returns (dayofyear, lat, lon). With 30 baseline years and a 15-day window
     each threshold is estimated from 450 samples, which is what makes a 90th
-    percentile stable enough to threshold against."""
+    percentile stable enough to threshold against.
+
+    Pooled raw, the window mixes days with different normals: on the steep
+    spring and autumn parts of the season that widens the spread and raises
+    the percentile (Brunner and Voigt 2024). With remove_cycle, each sample
+    first has its own day's normal subtracted (a running mean over
+    +/- CYCLE_HALF_WIDTH days of all baseline years), the percentile is taken
+    of what is left, and the target day's normal is added back."""
     doy = baseline["time"].dt.dayofyear
     baseline = baseline.assign_coords(dayofyear=doy)
     target_doys = np.unique(doy.values)
+    shape = (target_doys.size, baseline.sizes["latitude"],
+             baseline.sizes["longitude"])
 
-    out = np.empty((target_doys.size, baseline.sizes["latitude"],
-                    baseline.sizes["longitude"]), dtype="float32")
-    values = baseline.values
-    doy_values = doy.values
-    for i, d in enumerate(target_doys):
+    def near(d, half_width):
         # Circular distance in calendar days, so the window works across the
         # year boundary even though this domain only uses May-September.
         delta = np.abs(doy_values - d)
-        delta = np.minimum(delta, 366 - delta)
-        sel = values[delta <= window]
+        return np.minimum(delta, 366 - delta) <= half_width
+
+    values = baseline.values
+    doy_values = doy.values
+    normal = np.zeros(shape, dtype="float32")
+    if remove_cycle:
+        # ponytail: the running mean is one-sided within 15 days of the first
+        # and last baseline day; the April-October padding keeps that away
+        # from the May-September season.
+        for i, d in enumerate(target_doys):
+            normal[i] = np.nanmean(values[near(d, CYCLE_HALF_WIDTH)], axis=0)
+        values = values - normal[np.searchsorted(target_doys, doy_values)]
+
+    out = np.empty(shape, dtype="float32")
+    for i, d in enumerate(target_doys):
+        sel = values[near(d, window)]
         # np.quantile is about 5x faster than nanquantile and identical when
         # nothing is missing, which is the ERA5 case; keep nanquantile for
         # data with gaps.
         quantile = np.nanquantile if np.isnan(sel).any() else np.quantile
-        out[i] = quantile(sel, q, axis=0)
+        out[i] = quantile(sel, q, axis=0) + normal[i]
 
     return xr.DataArray(
         out,

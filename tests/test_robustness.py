@@ -34,6 +34,12 @@ def test_threshold_name():
     # Two summers must never share a leave-one-out cache.
     other = DH.baseline_years_for(2004, 1991, 2020, True)
     assert name != DH.threshold_name("europe", 1991, 2020, 0.95, "m04-10", 31, other)
+    # A cycle-removed threshold never reuses a raw cache, and its leave-one-out
+    # copy still matches the glob run_year deletes after each summer.
+    sc = DH.threshold_name("europe", 1991, 2020, 0.90, "m04-10", 21, loo, True)
+    assert sc == "heatwave_threshold_europe_1991_2020_p90_w21_sc_loo2003_m04-10.nc"
+    assert Path(sc).match("heatwave_threshold_europe_*_loo2003_*.nc")
+    assert DH.default_tag(21, 1991, 2020, loo, True) == "_w21_sc_loo"
 
 
 def test_names_never_collide():
@@ -180,10 +186,13 @@ def test_one_at_a_time():
     assert AY.tag_for(50_000, 0.90, 15) == "_a50k_p90_w15"
     assert AY.tag_for(50_000, 0.90, 15, 3) == "_a50k_p90_w15"
     assert AY.tag_for(50_000, 0.90, 15, 5) == "_a50k_p90_w15_d5"
+    assert AY.tag_for(50_000, 0.90, 21, 3, True) == "_a50k_p90_w21_sc"
     settings = AY.one_at_a_time_settings()
-    assert len(settings) == 4 + 5 + 5, len(settings)
-    assert ("min_days", 6, (50_000, 0.90, 15, 6)) in settings
-    assert ("window_days", 21, (50_000, 0.90, 21, 3)) in settings
+    assert len(settings) == 4 + 5 + 5 + 5, len(settings)
+    assert ("min_days", 6, (50_000, 0.90, 15, 6, False)) in settings
+    assert ("window_days", 21, (50_000, 0.90, 21, 3, False)) in settings
+    # Same window, cycle removed: a different setting, never the reference.
+    assert ("window_cycle_removed", 15, (50_000, 0.90, 15, 3, True)) in settings
 
     shape = np.array([10, 5, 5])
     cols = ["rank", "event_id", "severity_C_km2_day"]
@@ -207,7 +216,7 @@ def test_one_at_a_time():
         table = AY.compare_one_at_a_time(2003, w, top=6)
     moved = table[table.leader_moved]
     assert list(zip(moved.parameter, moved.value)) == [("min_days", 7)], moved
-    assert table.is_reference.sum() == 3      # the reference appears once per sweep
+    assert table.is_reference.sum() == 3      # once per raw sweep, never with the cycle removed
     assert not table.top3_left_top.any() and not table.top_merged.any()
 
 

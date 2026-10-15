@@ -43,14 +43,17 @@ def baseline_years_for(year: int, first: int, last: int,
 
 
 def threshold_name(region: str, first: int, last: int, pct: float, span: str,
-                   window: int, baseline_years: list[int]) -> str:
+                   window: int, baseline_years: list[int],
+                   remove_cycle: bool = False) -> str:
     """Cache filename for a threshold, keyed by everything that shapes it.
 
-    The default (15-day window, full baseline) keeps its original name so
-    existing caches and notebooks still find it."""
+    The default (15-day window, full baseline, raw pooling) keeps its
+    original name so existing caches and notebooks still find it."""
     name = f"heatwave_threshold_{region}_{first}_{last}_p{round(pct * 100, 1):g}"
     if window != 15:
         name += f"_w{window}"
+    if remove_cycle:
+        name += "_sc"
     dropped = sorted(set(range(first, last + 1)) - set(baseline_years))
     if dropped:
         name += "_loo" + "_".join(str(y) for y in dropped)
@@ -58,10 +61,13 @@ def threshold_name(region: str, first: int, last: int, pct: float, span: str,
 
 
 def default_tag(window: int, first: int, last: int,
-                baseline_years: list[int]) -> str:
-    """Output suffix for a run with no --tag, so a non-default window or a
-    leave-one-out baseline never overwrites the reference catalogue."""
+                baseline_years: list[int], remove_cycle: bool = False) -> str:
+    """Output suffix for a run with no --tag, so a non-default window, a
+    removed seasonal cycle or a leave-one-out baseline never overwrites the
+    reference catalogue."""
     tag = f"_w{window}" if window != 15 else ""
+    if remove_cycle:
+        tag += "_sc"
     if len(baseline_years) < last - first + 1:
         tag += "_loo"
     return tag
@@ -105,7 +111,7 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
         leave_one_out: bool = False, save_labels: bool = False,
         plot: bool = True, season: tuple[str, str] = ("05-01", "09-30"),
         baseline: tuple[int, int] = (1991, 2020), tag: str | None = None,
-        rebuild_threshold: bool = False) -> Path:
+        rebuild_threshold: bool = False, remove_cycle: bool = False) -> Path:
     """Catalogue one year under one setting; return the event CSV path."""
     if window < 1 or window % 2 == 0:
         raise ValueError(f"window must be odd and positive, got {window}: a "
@@ -128,7 +134,8 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
     span = f"m{int(months.min()):02d}-{int(months.max()):02d}"
     workdir.thresholds.mkdir(parents=True, exist_ok=True)
     thresh_path = workdir.thresholds / threshold_name(
-        workdir.region, first, last, percentile, span, window, baseline_years)
+        workdir.region, first, last, percentile, span, window, baseline_years,
+        remove_cycle)
     if thresh_path.exists() and not rebuild_threshold:
         threshold = xr.open_dataarray(thresh_path).load()
     else:
@@ -141,7 +148,8 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
                 f"run: {download_hint(workdir, f'{first}-{last}')}")
         baseline_da = D.open_daily_tmax(paths)
         threshold = D.calendar_day_percentile(baseline_da, q=percentile,
-                                              window=window // 2)
+                                              window=window // 2,
+                                              remove_cycle=remove_cycle)
         replace_atomically(threshold.to_netcdf, thresh_path)
         del baseline_da
 
@@ -151,7 +159,8 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
     events = D.event_table(det, target, min_area_km2=min_area)
     events = D.in_season(events, *season)
 
-    tag = default_tag(window, first, last, baseline_years) if tag is None else tag
+    tag = default_tag(window, first, last, baseline_years,
+                      remove_cycle) if tag is None else tag
     out_csv = workdir.catalogue_file(year, tag)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     if events.empty:
