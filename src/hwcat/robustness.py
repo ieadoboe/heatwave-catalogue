@@ -14,11 +14,16 @@ parameter moved them, merges, and how crowded its leading events were.
 Leave-one-out thresholds are about 36 MB each and only one summer uses them,
 so each is deleted once that summer's runs finish.
 
+With --one-at-a-time it instead sweeps each setting across its full range
+(ONE_AT_A_TIME: area to 625k km2, window 7 to 31 days, minimum days 3 to 7)
+with the others at the reference.
+
 Outputs, under <workdir>/robustness/:
   stability_<region>_<year>.csv               per setting, per top event
   catalogue_stability_allyears.csv            one row per summer
   (merge_settings counts settings in which two reference events became one)
   catalogue_stability_allyears.pdf
+  stability_one_at_a_time.csv / .pdf          --one-at-a-time
 """
 
 import subprocess
@@ -39,12 +44,32 @@ WINDOWS = (7, 15, 31)
 REFERENCE = (50_000, 0.90, 15)
 BASELINE = (1991, 2020)
 DATES = ["start", "peak", "end"]
+GRID = [(a, p, w, 3) for a, p, w in product(AREAS_KM2, PERCENTILES, WINDOWS)]
+
+# One setting at a time from the reference, each across its full range:
+# which value first moves the leader, not only whether some value does.
+ONE_AT_A_TIME = {"min_area_km2": (25_000, 50_000, 100_000, 625_000),
+                 "window_days": (7, 11, 15, 21, 31),
+                 "min_days": (3, 4, 5, 6, 7)}
 
 
+def one_at_a_time_settings() -> list[tuple[str, float, tuple]]:
+    """(parameter, value, setting) with setting = (area, pct, window, days)."""
+    ref = dict(zip(("min_area_km2", "percentile", "window_days", "min_days"),
+                   (*REFERENCE, 3)))
+    out = []
+    for param, values in ONE_AT_A_TIME.items():
+        for v in values:
+            s = {**ref, param: v}
+            out.append((param, v, (s["min_area_km2"], s["percentile"],
+                                   s["window_days"], s["min_days"])))
+    return out
 
 
-def tag_for(area_km2: float, pct: float, window: int) -> str:
-    return f"_a{int(area_km2 / 1000)}k_p{int(round(pct * 100))}_w{window}"
+def tag_for(area_km2: float, pct: float, window: int, min_days: int = 3) -> str:
+    """The default three days adds nothing, so the grid's files keep their names."""
+    tag = f"_a{int(area_km2 / 1000)}k_p{int(round(pct * 100))}_w{window}"
+    return tag if min_days == 3 else f"{tag}_d{min_days}"
 
 
 
@@ -131,10 +156,12 @@ def crowding(top: pd.DataFrame, max_gap_days: int = 3,
     return n
 
 
-def run_year(year: int, workdir: Workdir, skip_runs: bool = False) -> None:
-    """Every setting for one summer, then drop its leave-one-out thresholds."""
-    for area, pct, window in product(AREAS_KM2, PERCENTILES, WINDOWS):
-        tag = tag_for(area, pct, window)
+def run_year(year: int, workdir: Workdir, skip_runs: bool = False,
+             settings: list[tuple] = GRID) -> None:
+    """Every setting (area, pct, window, days) for one summer, then drop its
+    leave-one-out thresholds."""
+    for area, pct, window, days in settings:
+        tag = tag_for(area, pct, window, days)
         done = (workdir.catalogue_file(year, tag).exists()
                 and workdir.labels_file(year, tag).exists())
         if skip_runs or done:
@@ -142,7 +169,8 @@ def run_year(year: int, workdir: Workdir, skip_runs: bool = False) -> None:
         subprocess.run(
             [sys.executable, "-m", "hwcat", "detect", "--year", str(year),
              "--min-area", str(area), "--percentile", str(pct),
-             "--window", str(window), "--leave-one-out", "--no-plot",
+             "--window", str(window), "--min-days", str(days),
+             "--leave-one-out", "--no-plot",
              "--save-labels", "--workdir", str(workdir.root),
              "--region-name", workdir.region, "--tag", tag],
             check=True, stdout=subprocess.DEVNULL)
@@ -257,6 +285,114 @@ def plot(summary: pd.DataFrame, full: pd.DataFrame, rho: float, p: float,
     print(f"-> {path}")
 
 
+def run_all(years: list[int], workdir: Workdir, jobs: int,
+            settings: list[tuple]) -> None:
+    # Summers outside the baseline share one threshold per setting. Build
+    # those with a single summer first, so parallel runs never race to
+    # write the same cache file.
+    # ponytail: assumes every shared summer has the same month span (part
+    # of the cache key), true for the April-October downloads. Group the
+    # shared summers by span if a download ever differs.
+    todo = list(years)
+    shared = [y for y in todo if not BASELINE[0] <= y <= BASELINE[1]]
+    if shared:
+        run_year(shared[0], workdir, settings=settings)
+        todo.remove(shared[0])
+    with ThreadPoolExecutor(jobs) as pool:
+        list(pool.map(lambda y: run_year(y, workdir, settings=settings), todo))
+
+
+def compare_one_at_a_time(year: int, workdir: Workdir, top: int) -> pd.DataFrame:
+    """One row per (parameter, value): what that single change does to the
+    reference top events."""
+    def load(setting):
+        tag = tag_for(*setting)
+        if not workdir.catalogue_file(year, tag).exists():
+            return None
+        return (pd.read_csv(workdir.catalogue_file(year, tag)),
+                footprint(workdir.labels_file(year, tag)))
+
+    loaded = load((*REFERENCE, 3))
+    if loaded is None or loaded[0].empty:
+        return pd.DataFrame()
+    ref_all, ref_fp = loaded
+    ref = ref_all.head(top)
+    rows = []
+    for param, value, setting in one_at_a_time_settings():
+        got = load(setting)
+        if got is None:
+            continue
+        run, run_fp = got
+        m = match_by_overlap(ref_all, ref_fp, run, run_fp).iloc[:len(ref)]
+        new = np.array([run.loc[j, "rank"] if j >= 0 else np.inf
+                        for j in m.run_index])
+        old = ref["rank"].to_numpy()
+        rows.append({"year": year, "parameter": param, "value": value,
+                     "is_reference": setting == (*REFERENCE, 3),
+                     "n_events": len(run),
+                     "leader_moved": bool(new[0] != 1),
+                     "n_top_moved": int((new != old).sum()),
+                     "top3_left_top": bool((new[:3] > top).any()),
+                     "top_merged": bool(m.merged.any())})
+    return pd.DataFrame(rows)
+
+
+def plot_one_at_a_time(table: pd.DataFrame, top: int, path: Path) -> None:
+    from hwcat.plots import mpl_apply
+    mpl_apply()
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+
+    n = table.year.nunique()
+    by = table.groupby(["parameter", "value"])[
+        ["leader_moved", "top3_left_top", "top_merged"]].sum()
+    labels = {"min_area_km2": r"minimum area (1000 km$^2$)",
+              "window_days": "window (days)", "min_days": "minimum days"}
+    ref = {"min_area_km2": REFERENCE[0], "window_days": REFERENCE[2],
+           "min_days": 3}
+    fig, axes = plt.subplots(1, 3, figsize=(11, 3.4), sharey=True)
+    for ax, param in zip(axes, ONE_AT_A_TIME):
+        d = by.loc[param]
+        x = np.arange(len(d))
+        ax.bar(x - 0.27, d.leader_moved, 0.27, color="#B5470F",
+               label="leader moved")
+        ax.bar(x, d.top3_left_top, 0.27, color="#1D4E89",
+               label=f"a top-3 event left the top {top}")
+        ax.bar(x + 0.27, d.top_merged, 0.27, color="#7FB069",
+               label=f"two top-{top} events merged")
+        ticks = [f"{v / 1000:g}" if param == "min_area_km2" else f"{v:g}"
+                 for v in d.index]
+        ax.set_xticks(x, ticks)
+        ax.get_xticklabels()[list(d.index).index(ref[param])].set_fontweight("bold")
+        ax.set_xlabel(labels[param])
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    axes[0].set_ylabel(f"summers (of {n})")
+    axes[0].legend(frameon=False, fontsize=7.5)
+    fig.suptitle("One setting changed at a time; bold value is the reference",
+                 fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    print(f"-> {path}")
+
+
+def one_at_a_time(years: list[int], workdir: Workdir, top: int = 6,
+                  jobs: int = 3, skip_runs: bool = False) -> pd.DataFrame:
+    """Each setting across its full range, the others at the reference."""
+    workdir.robustness.mkdir(parents=True, exist_ok=True)
+    if not skip_runs:
+        run_all(years, workdir, jobs, [s for _, _, s in one_at_a_time_settings()])
+    table = pd.concat([compare_one_at_a_time(y, workdir, top) for y in years],
+                      ignore_index=True)
+    out = workdir.robustness / "stability_one_at_a_time.csv"
+    table.to_csv(out, index=False)
+    print(f"-> {out}\n")
+    print(table.groupby(["parameter", "value"])[
+        ["leader_moved", "top3_left_top", "top_merged"]].sum().to_string())
+    plot_one_at_a_time(table, top,
+                       workdir.robustness / "stability_one_at_a_time.pdf")
+    return table
+
+
 def sweep(years: list[int], workdir: Workdir, top: int = 6, jobs: int = 3,
           skip_runs: bool = False) -> pd.DataFrame:
     """Every setting for every summer, the per-summer stability summary, and
@@ -264,19 +400,7 @@ def sweep(years: list[int], workdir: Workdir, top: int = 6, jobs: int = 3,
 
     workdir.robustness.mkdir(parents=True, exist_ok=True)
     if not skip_runs:
-        # Summers outside the baseline share one threshold per setting. Build
-        # those with a single summer first, so parallel runs never race to
-        # write the same cache file.
-        # ponytail: assumes every shared summer has the same month span (part
-        # of the cache key), true for the April-October downloads. Group the
-        # shared summers by span if a download ever differs.
-        todo = list(years)
-        shared = [y for y in todo if not BASELINE[0] <= y <= BASELINE[1]]
-        if shared:
-            run_year(shared[0], workdir)
-            todo.remove(shared[0])
-        with ThreadPoolExecutor(jobs) as pool:
-            list(pool.map(lambda y: run_year(y, workdir), todo))
+        run_all(years, workdir, jobs, GRID)
 
     tables, rows = [], []
     for year in years:

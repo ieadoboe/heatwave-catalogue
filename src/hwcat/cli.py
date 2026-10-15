@@ -66,6 +66,9 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--years", nargs="+", required=True)
     r.add_argument("--top", type=int, default=6)
     r.add_argument("--jobs", type=int, default=3)
+    r.add_argument("--one-at-a-time", action="store_true",
+                   help="Sweep each setting across its full range, the "
+                        "others at the reference, instead of the grid")
 
     a = parser.parse_args(argv)
     wd = Workdir(a.workdir, region=a.region_name)
@@ -84,7 +87,8 @@ def main(argv: list[str] | None = None) -> None:
                 leave_one_out=a.leave_one_out, save_labels=a.save_labels,
                 plot=not a.no_plot, tag=a.tag)
         else:
-            from hwcat.robustness import sweep
-            sweep(parse_years(a.years), wd, top=a.top, jobs=a.jobs)
+            from hwcat.robustness import one_at_a_time, sweep
+            run = one_at_a_time if a.one_at_a_time else sweep
+            run(parse_years(a.years), wd, top=a.top, jobs=a.jobs)
     except (ValueError, FileNotFoundError) as e:
         sys.exit(f"hwcat {a.command}: {e}")

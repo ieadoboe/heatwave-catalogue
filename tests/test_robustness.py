@@ -172,7 +172,47 @@ def test_paper_table():
     assert merged.survives.all()
 
 
+def test_one_at_a_time():
+    """Tags, the settings list, and one sweep value that moves the leader."""
+    import tempfile
+    import numpy as np
+    # Three days keeps the grid's file names; any other count is marked.
+    assert AY.tag_for(50_000, 0.90, 15) == "_a50k_p90_w15"
+    assert AY.tag_for(50_000, 0.90, 15, 3) == "_a50k_p90_w15"
+    assert AY.tag_for(50_000, 0.90, 15, 5) == "_a50k_p90_w15_d5"
+    settings = AY.one_at_a_time_settings()
+    assert len(settings) == 4 + 5 + 5, len(settings)
+    assert ("min_days", 6, (50_000, 0.90, 15, 6)) in settings
+    assert ("window_days", 21, (50_000, 0.90, 21, 3)) in settings
+
+    shape = np.array([10, 5, 5])
+    cols = ["rank", "event_id", "severity_C_km2_day"]
+
+    def save(path, ids, cells):
+        t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(shape))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(path, t=t, i=i, j=j,
+                            event_id=np.asarray(ids, dtype=np.int32), shape=shape)
+
+    with tempfile.TemporaryDirectory() as d:
+        w = Workdir(Path(d))
+        w.catalogues.mkdir(parents=True)
+        ref = pd.DataFrame([[1, 1, 9e7], [2, 2, 5e7]], columns=cols)
+        swapped = pd.DataFrame([[1, 2, 6e7], [2, 1, 4e7]], columns=cols)
+        for param, value, setting in settings:
+            tag = AY.tag_for(*setting)
+            cat = swapped if (param, value) == ("min_days", 7) else ref
+            cat.to_csv(w.catalogue_file(2003, tag), index=False)
+            save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, list(range(8)))
+        table = AY.compare_one_at_a_time(2003, w, top=6)
+    moved = table[table.leader_moved]
+    assert list(zip(moved.parameter, moved.value)) == [("min_days", 7)], moved
+    assert table.is_reference.sum() == 3      # the reference appears once per sweep
+    assert not table.top3_left_top.any() and not table.top_merged.any()
+
+
 if __name__ == "__main__":
+    test_one_at_a_time()
     test_leave_one_out()
     test_threshold_name()
     test_names_never_collide()
