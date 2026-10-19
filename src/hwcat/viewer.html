@@ -190,7 +190,7 @@
       <summary><h2>Filter events</h2><span id="active"></span></summary>
       <div class="filter-body">
       <button id="reset" class="link">Reset filters</button>
-      <label class="check"><input type="checkbox" id="europe" checked> European events only<small>Hide events that touch no European country</small></label>
+      <label class="check"><input type="checkbox" id="home" checked> <span class="homeName"></span> events only<small>Hide events that touch no <span class="homeName"></span> country</small></label>
       <label class="field">Country <select id="country"></select></label>
       <label class="field">Climate zone <select id="zone"></select></label>
       <label class="field"><span class="lab">Min duration <b id="minDaysV"></b></span>
@@ -275,8 +275,9 @@ function seg(id, values, labels, initial, onchange) {
 }
 const val = id => document.querySelector(`input[name=${id}]:checked`).value;
 
-// The grid is plate carree; squash its width by cos(mid-latitude) so Europe
-// keeps roughly its true shape.
+// The grid is plate carree; squash its width by cos(mid-latitude) so the
+// region keeps roughly its true shape.
+document.querySelectorAll(".homeName").forEach(s => s.textContent = D.homeName);
 const midLat = D.lat0 + D.dlat * (D.ny - 1) / 2;
 const AR = D.nx * Math.cos(midLat * RAD) / D.ny;
 $("mapwrap").style.aspectRatio = AR;
@@ -346,12 +347,12 @@ async function onSetting() {
   $("minDaysV").textContent = `${minDays} days`;
   $("minAreaV").textContent = minArea ? fmtArea(minArea) : "any";
   $("minAnomV").textContent = minAnom ? `+${minAnom} °C` : "any";
-  const europe = $("europe").checked;
-  const active = [!europe, ctry, zone, minDays > 3, minArea, minAnom].filter(Boolean).length;
+  const home = $("home").checked;
+  const active = [!home, ctry, zone, minDays > 3, minArea, minAnom].filter(Boolean).length;
   $("active").textContent = active ? `${active} active` : "";
   events = (run ? run.events : []).filter(e =>
     (!m || (Date.parse(e[col.start]) < Date.UTC(y, m, 1) && Date.parse(e[col.end]) >= Date.UTC(y, m - 1, 1))) &&
-    (!europe || run.byCountry.get(e[col.event_id]).some((v, c) => v > 0 && D.european[c])) &&
+    (!home || run.byCountry.get(e[col.event_id]).some((v, c) => v > 0 && D.home[c])) &&
     (!ctry || run.byCountry.get(e[col.event_id])[ctry] > 0) && (!zone || e[col.zone] === zone) && e[col.duration_days] >= minDays &&
     e[col.peak_area_km2] >= minArea && e[col.max_anom_C] >= minAnom);
   const by = $("sort").value, c = col[by];
@@ -514,10 +515,10 @@ function play() {
     .map(([n, c]) => `<option value="${c}">${n}</option>`).join("");
   $("zone").innerHTML = `<option value="">All zones</option>` +
     ["temperate", "cold (continental)", "arid", "polar"].map(z => `<option>${z}</option>`).join("");
-  $("year").onchange = $("month").onchange = $("europe").onchange = $("country").onchange = $("zone").onchange = $("sort").onchange = onSetting;
+  $("year").onchange = $("month").onchange = $("home").onchange = $("country").onchange = $("zone").onchange = $("sort").onchange = onSetting;
   for (const id of ["minDays", "minArea", "minAnom"]) $(id).oninput = onSetting;
   $("reset").onclick = () => {
-    $("europe").checked = true; $("country").value = 0; $("zone").value = ""; $("minDays").value = 3; $("minArea").value = 0; $("minAnom").value = 0; onSetting();
+    $("home").checked = true; $("country").value = 0; $("zone").value = ""; $("minDays").value = 3; $("minArea").value = 0; $("minAnom").value = 0; onSetting();
   };
   $("showTrail").onchange = $("showOther").onchange = draw;
   $("events").onclick = ev => { const li = ev.target.closest("li[data-k]"); if (li) select(+li.dataset.k); };

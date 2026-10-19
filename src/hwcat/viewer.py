@@ -52,23 +52,27 @@ def pack_run(csv: Path, npz: Path) -> dict | None:
             "cells": b64gz(blob)}
 
 
-def country_grid(lat: np.ndarray, lon: np.ndarray, land: np.ndarray):
+# Which countries are the region's own, and the word for them on the page.
+# Natural Earth files Cyprus under Asia; it is an EU member, so it counts.
+HOME = {"europe": ("European", lambda name, continent: continent == "Europe" or name == "Cyprus"),
+        "canada": ("Canadian", lambda name, continent: name == "Canada")}
+
+
+def country_grid(lat: np.ndarray, lon: np.ndarray, land: np.ndarray, region: str):
     """Country index per cell of this grid, the names it indexes, and
-    whether each is European.
+    whether each is one of the region's own (HOME).
 
     Nearest 0.1 degree cell, as land_mask_for does. A coastal land cell whose
     centre falls just offshore of the Natural Earth outline takes the nearest
     country, so every land cell an event can cover has one."""
-    f = np.load(Path(__file__).parent / "data" / "countries_europe_0p1.npz")
+    f = np.load(Path(__file__).parent / "data" / f"countries_{region}_0p1.npz")
     i = np.abs(f["lat"][:, None] - lat[None, :]).argmin(axis=0)
     j = np.abs(f["lon"][:, None] - lon[None, :]).argmin(axis=0)
     grid = f["country"][np.ix_(i, j)]
     _, (ni, nj) = ndimage.distance_transform_edt(grid == 0, return_indices=True)
     grid = np.where(land & (grid == 0), grid[ni, nj], grid)
-    # Natural Earth files Cyprus under Asia; it is an EU member, so it counts.
-    european = [str(c) == "Europe" or str(n) == "Cyprus"
-                for n, c in zip(f["names"], f["continents"])]
-    return grid.astype(np.uint8), [str(n) for n in f["names"]], european
+    home = [HOME[region][1](str(n), str(c)) for n, c in zip(f["names"], f["continents"])]
+    return grid.astype(np.uint8), [str(n) for n in f["names"]], home
 
 
 def zone_grid(lat: np.ndarray, lon: np.ndarray):
@@ -89,7 +93,7 @@ def build(workdir: Workdir) -> Path:
         f"{workdir.region}_tmax_*.nc"))[0])
     lat, lon = grid["latitude"].values, grid["longitude"].values
     land = land_mask_for(lat, lon)
-    countries, names, european = country_grid(lat, lon, land)
+    countries, names, home = country_grid(lat, lon, land, workdir.region)
     zone_cells, zone_names = zone_grid(lat, lon)
 
     runs, years = {}, set()
@@ -109,10 +113,11 @@ def build(workdir: Workdir) -> Path:
             "lon0": float(lon[0]), "dlon": float(lon[1] - lon[0]),
             "ny": int(lat.size), "nx": int(lon.size),
             "land": b64gz(np.packbits(land).tobytes()),
-            "country": b64gz(countries.tobytes()), "countries": names, "european": european,
+            "country": b64gz(countries.tobytes()), "countries": names,
+            "home": home, "homeName": HOME[workdir.region][0],
             "zone": b64gz(zone_cells.tobytes()), "zones": zone_names,
             "borders": json.loads((Path(__file__).parent / "data"
-                                   / "borders_europe_ne50m.json").read_text()),
+                                   / f"borders_{workdir.region}_ne50m.json").read_text()),
             "years": sorted(years), "columns": COLUMNS,
             "areas": [int(a / 1000) for a in AREAS_KM2],
             "pcts": [int(round(p * 100)) for p in PERCENTILES],
