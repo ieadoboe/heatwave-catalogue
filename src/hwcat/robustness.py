@@ -222,6 +222,21 @@ def compare_year(year: int, workdir: Workdir, top: int = 6
                             for j in mm.run_index[:top]])
             old = np.arange(1, len(new) + 1)
             top_hits = mm.run_index[:top][mm.run_index[:top] >= 0]
+            # Which reference event the run's number 1 is (0: none of them),
+            # and the log severity gap between reference 1 and 2, before and
+            # in this run, for the null model in hwcat.review.
+            winner = 0
+            if len(run):
+                r1 = int(np.argmin(run_rank["rank"].to_numpy()))
+                on_top = np.flatnonzero(mm.run_index.to_numpy() == r1)
+                winner = int(on_top[0]) + 1 if on_top.size else 0
+            ref_sev = ref[col].to_numpy()[order]
+            gap_ref = (np.log(ref_sev[0] / ref_sev[1])
+                       if len(ref_sev) > 1 and ref_sev[1] > 0 else np.nan)
+            j1, j2 = (mm.run_index.iloc[:2].tolist() + [-1, -1])[:2]
+            gap_run = (np.log(run[col].iloc[j1] / run[col].iloc[j2])
+                       if min(j1, j2) >= 0 and j1 != j2
+                       and run[col].iloc[j2] > 0 else np.nan)
             rows.append({
                 "year": year, "family": family, "value": value,
                 **s._asdict(), "metric": metric, "n_events": len(run),
@@ -229,7 +244,9 @@ def compare_year(year: int, workdir: Workdir, top: int = 6
                 "leader_new_rank": new[0],
                 "n_top_moved": int((new != old).sum()),
                 "top3_left_top": bool((new[:3] > top).any()),
-                "top_pair_merged": bool(top_hits.duplicated().any())})
+                "top_pair_merged": bool(top_hits.duplicated().any()),
+                "winner_ref_rank": winner, "gap_ref": gap_ref,
+                "gap_run": gap_run})
     table = pd.DataFrame(rows)
 
     sev = np.sort(ref.severity_C_km2_day.to_numpy())[::-1]

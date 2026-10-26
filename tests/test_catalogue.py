@@ -3,6 +3,7 @@ and equivalence with the reference outputs frozen before the move.
 
     python tests/test_catalogue.py
 """
+import os
 import tempfile
 from pathlib import Path
 
@@ -13,8 +14,11 @@ import xarray as xr
 from hwcat import catalogue as C
 from hwcat.workdir import Workdir
 
-REF = Path("/Users/isaacadoboe/Developer/hwcat-reference")
-ERA5 = Path("/Users/isaacadoboe/Developer/heatwave-initial-conditions/data/era5_europe")
+REF = Path(os.environ.get("HWCAT_REFERENCE",
+                         "/Users/isaacadoboe/Developer/hwcat-reference"))
+ERA5 = Path(os.environ.get(
+    "HWCAT_ERA5",
+    "/Users/isaacadoboe/Developer/heatwave-initial-conditions/data/era5_europe"))
 
 
 def test_layout():

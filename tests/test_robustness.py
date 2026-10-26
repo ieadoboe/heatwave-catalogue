@@ -154,6 +154,15 @@ def test_compare_year():
     assert summary["top_pair_merged"]
     assert abs(summary["lead"] - (1 - 5 / 9)) < 1e-9
     assert summary["leader_peak_month"] == 7 and summary["in_baseline"]
+    # The run's number 1 at the 95th is reference event 2; the 1-2 gap
+    # turns from log(9/5) to log(4/6).
+    p95 = table[(table.metric == "severity") & (table.family == "percentile")
+                & (table.pct == 0.95)].iloc[0]
+    assert p95.winner_ref_rank == 2, p95
+    assert abs(p95.gap_ref - np.log(9 / 5)) < 1e-9 and \
+        abs(p95.gap_run - np.log(4 / 6)) < 1e-9, p95
+    gone = table[(table.family == "min_area_km2") & (table.area == 250_000)].iloc[0]
+    assert gone.winner_ref_rank == 0 and np.isnan(gone.gap_run), gone
 
 
 def test_restart_skips_finished_settings():
