@@ -3,7 +3,6 @@ and equivalence with the reference outputs frozen before the move.
 
     python tests/test_catalogue.py
 """
-import filecmp
 import tempfile
 from pathlib import Path
 
@@ -75,15 +74,19 @@ def test_all_ocean_box_gives_empty_catalogue():
 
 
 def test_matches_reference_2003():
-    """Leave-one-out reference setting for 2003, byte for byte."""
+    """The frozen 2003 run, under the settings it was made with (raw pooling,
+    the whole box), value for value on its own columns; label files exact.
+    Later versions add columns, such as touches_edge, but must not change
+    these."""
     with tempfile.TemporaryDirectory() as d:
         w = Workdir(Path(d))
         w.era5.parent.mkdir(parents=True, exist_ok=True)
         w.era5.symlink_to(ERA5)
         out = C.run(2003, w, leave_one_out=True, save_labels=True, plot=False,
-                    tag="_a50k_p90_w15")
-        ref = REF / "catalogues" / out.name
-        assert filecmp.cmp(out, ref, shallow=False), (out, ref)
+                    tag="_a50k_p90_w15", remove_cycle=False, whole_box=True)
+        ref = pd.read_csv(REF / "catalogues" / out.name)
+        new = pd.read_csv(out)
+        pd.testing.assert_frame_equal(new[ref.columns], ref)
         a = np.load(w.labels_file(2003, "_a50k_p90_w15"))
         b = np.load(REF / "catalogues" / "labels" / w.labels_file(2003, "_a50k_p90_w15").name)
         for k in ("t", "i", "j", "event_id", "shape"):

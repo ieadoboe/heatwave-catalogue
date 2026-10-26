@@ -1,17 +1,25 @@
-"""Check the leave-one-out baseline, the threshold cache names, and the
-all-summers summary helpers.
+"""Check the leave-one-out baseline, the threshold cache names, the settings
+list, and the all-summers comparison on hand-made catalogues.
 
-    python tests/test_catalogue_stability.py
+    python tests/test_robustness.py
 """
+import tempfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
-
-REPO = Path(__file__).resolve().parents[1]
-
 
 from hwcat import catalogue as DH, robustness as AY
 from hwcat.workdir import Workdir
+
+SHAPE = np.array([10, 5, 5])
+
+
+def save(path, ids, cells):
+    t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(SHAPE))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, t=t, i=i, j=j,
+                        event_id=np.asarray(ids, dtype=np.int32), shape=SHAPE)
 
 
 def test_leave_one_out():
@@ -25,41 +33,55 @@ def test_leave_one_out():
 
 def test_threshold_name():
     full = list(range(1991, 2021))
-    # The default keeps its original name, so old caches still match.
+    # Raw pooling keeps the original cache names, so old caches still match.
     assert DH.threshold_name("europe", 1991, 2020, 0.90, "m04-10", 15, full) == \
         "heatwave_threshold_europe_1991_2020_p90_m04-10.nc"
     loo = DH.baseline_years_for(2003, 1991, 2020, True)
     name = DH.threshold_name("europe", 1991, 2020, 0.95, "m04-10", 31, loo)
     assert name == "heatwave_threshold_europe_1991_2020_p95_w31_loo2003_m04-10.nc"
-    # Two summers must never share a leave-one-out cache.
     other = DH.baseline_years_for(2004, 1991, 2020, True)
     assert name != DH.threshold_name("europe", 1991, 2020, 0.95, "m04-10", 31, other)
-    # A cycle-removed threshold never reuses a raw cache, and its leave-one-out
-    # copy still matches the glob run_year deletes after each summer.
     sc = DH.threshold_name("europe", 1991, 2020, 0.90, "m04-10", 21, loo, True)
     assert sc == "heatwave_threshold_europe_1991_2020_p90_w21_sc_loo2003_m04-10.nc"
     assert Path(sc).match("heatwave_threshold_europe_*_loo2003_*.nc")
-    assert DH.default_tag(21, 1991, 2020, loo, True) == "_w21_sc_loo"
+    # The interquartile thresholds behind --rescore get their own names.
+    q = DH.threshold_name("europe", 1991, 2020, 0.25, "m04-10", 15, loo, True)
+    assert "_p25_sc_loo2003" in q, q
+
+
+def test_default_tag():
+    full = list(range(1991, 2021))
+    loo = DH.baseline_years_for(2003, 1991, 2020, True)
+    # The seasonal cycle is removed by default; raw pooling is marked.
+    assert DH.default_tag(15, 1991, 2020, full) == ""
+    assert DH.default_tag(15, 1991, 2020, full, remove_cycle=False) == "_raw"
+    assert DH.default_tag(31, 1991, 2020, loo) == "_w31_loo"
+    assert DH.default_tag(21, 1991, 2020, loo, False) == "_w21_raw_loo"
 
 
 def test_names_never_collide():
     full = list(range(1991, 2021))
-    # Truncating 0.57 * 100 gave 56, colliding with 0.56.
     a = DH.threshold_name("europe", 1991, 2020, 0.57, "m04-10", 15, full)
     b = DH.threshold_name("europe", 1991, 2020, 0.56, "m04-10", 15, full)
     assert a != b and "_p57_" in a, (a, b)
     assert "_p97.5_" in DH.threshold_name("europe", 1991, 2020, 0.975, "m04-10", 15, full)
-    # A standalone run must not overwrite the reference catalogue.
-    loo = DH.baseline_years_for(2003, 1991, 2020, True)
-    assert DH.default_tag(15, 1991, 2020, full) == ""
-    assert DH.default_tag(31, 1991, 2020, loo) == "_w31_loo"
 
 
-def test_changed_parameter():
-    assert AY.changed_parameter(25_000, 0.90, 15) == "area"
-    assert AY.changed_parameter(50_000, 0.95, 15) == "percentile"
-    assert AY.changed_parameter(50_000, 0.90, 7) == "window"
-    assert AY.changed_parameter(25_000, 0.95, 15) is None
+def test_settings_and_tags():
+    assert AY.tag_of(AY.REFERENCE) == "_a50k_p90_w15_sc"
+    assert AY.tag_for(50_000, 0.90, 15) == "_a50k_p90_w15"   # the old grid's name
+    assert AY.tag_for(250_000, 0.925, 15, 4, True, 26) == "_a250k_p92.5_w15_d4_sc_c26"
+    s = AY.settings(2010)
+    tags = {AY.tag_of(x) for _, _, x in s}
+    assert len(tags) == len({x for _, _, x in s}), "two settings share a tag"
+    fams = {f for f, _, _ in s}
+    assert fams == {*AY.SWEEPS, "window_raw", "grid"}, fams
+    assert ("window_raw", 31, AY.REFERENCE._replace(window=31, cycle=False)) in s
+    # The paper's area x percentile combinations only for its three summers.
+    assert "paper" not in fams and "paper" in {f for f, _, _ in AY.settings(2003)}
+    # Every single-change family includes the reference value once.
+    for fam in AY.SWEEPS:
+        assert sum(x == AY.REFERENCE for f, _, x in s if f == fam) == 1, fam
 
 
 def test_crowding():
@@ -68,55 +90,75 @@ def test_crowding():
         "end": pd.to_datetime(["2026-07-03", "2026-07-24", "2026-09-12"]),
         "centroid_lat": [48.9, 46.8, 41.3],
         "centroid_lon": [13.6, 4.8, 17.1]})
-    # June and July overlap by four days, about 6 degrees apart: one pair.
-    # August starts 26 days after July ends: not close in time.
     assert AY.crowding(top) == 1
     assert AY.crowding(top, max_dist_deg=5.0) == 0
 
 
-def test_empty_setting():
-    """compare_year end to end, with one setting that found nothing."""
-    import tempfile
-    import numpy as np
-    ref = pd.DataFrame({
-        "rank": [1, 2], "event_id": [1, 2],
-        "start": ["2003-07-29", "2003-04-29"], "peak": ["2003-08-10", "2003-05-08"],
-        "end": ["2003-08-15", "2003-05-16"],
-        "centroid_lat": [46.0, 45.0], "centroid_lon": [4.0, 19.0]})
-    shape = np.array([10, 5, 5])
+def catalogue(ids, sev, sev_ref=None, sev_norm=None, start="2003-07-01",
+              peak="2003-07-05", end="2003-07-10"):
+    n = len(ids)
+    return pd.DataFrame({
+        "rank": range(1, n + 1), "event_id": ids,
+        "start": [start] * n, "peak": [peak] * n, "end": [end] * n,
+        "centroid_lat": [46.0 + 5 * k for k in range(n)],
+        "centroid_lon": [4.0 + 10 * k for k in range(n)],
+        "severity_C_km2_day": sev,
+        "severity_ref_C_km2_day": sev_ref if sev_ref is not None else sev,
+        "severity_norm_km2_day": sev_norm if sev_norm is not None else sev,
+        "touches_edge": [False] * n})
 
-    def save(path, ids, cells):
-        t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(shape))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(path, t=t, i=i, j=j,
-                            event_id=np.asarray(ids, dtype=np.int32), shape=shape)
 
+def test_compare_year():
+    """Event 1 (cells 0-4) leads event 2 (cells 5-7). At the 95th percentile
+    event 2 overtakes by its own bar but not by the reference bar; at
+    25,000 km2 the two join; at 250,000 km2 nothing is found."""
     with tempfile.TemporaryDirectory() as d:
         w = Workdir(Path(d))
         w.labels.mkdir(parents=True)
-        for area, pct, window in AY.product(AY.AREAS_KM2, AY.PERCENTILES,
-                                            AY.WINDOWS):
-            tag = AY.tag_for(area, pct, window)
+        ref = catalogue([1, 2], [9e7, 5e7])
+        for fam, value, s in AY.settings(2003):
+            tag = AY.tag_of(s)
             csv = w.catalogue_file(2003, tag)
-            if (area, pct, window) == (100_000, 0.95, 7):
+            if s == AY.REFERENCE._replace(pct=0.95):
+                catalogue([2, 1], [6e7, 4e7], sev_ref=[5e7, 9e7]).to_csv(csv, index=False)
+                save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, range(8))
+            elif s == AY.REFERENCE._replace(area=25_000):
+                catalogue([7], [1.4e8]).to_csv(csv, index=False)
+                save(w.labels_file(2003, tag), [7] * 8, range(8))
+            elif s == AY.REFERENCE._replace(area=250_000):
                 pd.DataFrame(columns=["rank", "start", "peak", "end"]).to_csv(
                     csv, index=False)
                 save(w.labels_file(2003, tag), [], [])
             else:
                 ref.to_csv(csv, index=False)
-                save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, list(range(8)))
+                save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, range(8))
         table, summary = AY.compare_year(2003, w, top=6)
-    empty = table[(table.min_area_km2 == 100_000) & (table.percentile == 0.95)
-                  & (table.window_days == 7)]
-    assert empty.moved.all() and empty["rank"].isna().all(), empty
-    assert summary["n_ref"] == 2 and summary["n_moved_any"] == 2, summary
-    assert summary["n_moved_area"] == 0, summary   # only the "several" bucket
-    assert summary["n_top_merged"] == 0, summary
+
+    def leader(metric, **kw):
+        t = table[table.metric == metric]
+        for k, v in kw.items():
+            t = t[t[k] == v]
+        return t.leader.iloc[0]
+
+    assert leader("severity", family="percentile", pct=0.95) == "replaced"
+    assert leader("severity_ref", family="percentile", pct=0.95) == "held"
+    assert leader("severity", family="min_area_km2", area=25_000) == "absorbed"
+    assert leader("severity", family="min_area_km2", area=250_000) == "vanished"
+    assert leader("severity", family="min_days", days=4) == "held"
+    assert summary["leader_moved"] and summary["moved_percentile"]
+    assert summary["moved_min_area_km2"]          # the vanishing counts
+    # By the reference bar the 95th no longer moves it; only the vanishing does.
+    assert summary["n_settings_moving_leader"] == 2, summary
+    assert summary["n_settings_moving_leader_severity_ref"] == 1, summary
+    assert summary["leader_absorbed"] and not summary["leader_split"]
+    assert summary["top_pair_merged"]
+    assert abs(summary["lead"] - (1 - 5 / 9)) < 1e-9
+    assert summary["leader_peak_month"] == 7 and summary["in_baseline"]
 
 
 def test_restart_skips_finished_settings():
-    """A second run_year must not relaunch settings whose outputs exist."""
-    import tempfile
+    """A second run_year must not relaunch settings whose current outputs
+    exist, and must redo ones an older version wrote."""
     calls = []
     real = AY.subprocess.run
     AY.subprocess.run = lambda cmd, **kw: calls.append(cmd)
@@ -124,22 +166,20 @@ def test_restart_skips_finished_settings():
         with tempfile.TemporaryDirectory() as d:
             w = Workdir(Path(d))
             w.labels.mkdir(parents=True)
-            for area, pct, window in AY.product(AY.AREAS_KM2, AY.PERCENTILES, AY.WINDOWS):
-                tag = AY.tag_for(area, pct, window)
-                w.catalogue_file(2003, tag).write_text("rank,start,peak,end\n")
-                w.labels_file(2003, tag).write_bytes(b"")
-            AY.run_year(2003, w)
+            stale = AY.REFERENCE._replace(area=25_000)
+            for _, _, s in AY.settings(2010):
+                tag = AY.tag_of(s)
+                header = "rank,severity_C_km2_day\n" if s == stale else \
+                    "rank,severity_C_km2_day,touches_edge\n"
+                w.catalogue_file(2010, tag).write_text(header)
+                w.labels_file(2010, tag).write_bytes(b"")
+            AY.run_year(2010, w)
     finally:
         AY.subprocess.run = real
-    assert calls == [], calls
+    assert len(calls) == 1 and AY.tag_of(stale) in calls[0], calls
 
 
 def test_paper_table():
-    """The 3-summer table behind paper Figure 4: same columns as before,
-    15-day window only, shared-cell matching, merges as a shared new rank."""
-    import tempfile
-    import numpy as np
-    shape = np.array([10, 5, 5])
     cols = ["rank", "event_id", "start", "peak", "end", "duration_days",
             "peak_area_km2", "severity_C_km2_day", "centroid_lat", "centroid_lon"]
     ref = pd.DataFrame([[1, 1, "2003-07-29", "2003-08-10", "2003-08-15", 18, 9e5, 5e7, 46.0, 4.0],
@@ -147,87 +187,34 @@ def test_paper_table():
                        columns=cols)
     joint = pd.DataFrame([[1, 7, "2003-07-20", "2003-08-10", "2003-08-15", 27, 1.3e6, 7e7, 46.5, 5.0]],
                          columns=cols)
-
-    def save(path, ids, cells):
-        t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(shape))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(path, t=t, i=i, j=j,
-                            event_id=np.asarray(ids, dtype=np.int32), shape=shape)
-
     with tempfile.TemporaryDirectory() as d:
         w = Workdir(Path(d))
         w.catalogues.mkdir(parents=True)
-        for area, pct, window in AY.product(AY.AREAS_KM2, AY.PERCENTILES, AY.WINDOWS):
-            tag = AY.tag_for(area, pct, window)
-            if (area, pct, window) == (25_000, 0.90, 15):      # joins 1 and 2
-                joint.to_csv(w.catalogue_file(2003, tag), index=False)
-                save(w.labels_file(2003, tag), [7] * 8, list(range(8)))
-            else:
-                ref.to_csv(w.catalogue_file(2003, tag), index=False)
-                save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, list(range(8)))
+        for area in AY.PAPER_AREAS:
+            for pct in AY.PAPER_PCTS:
+                tag = AY.tag_of(AY.REFERENCE._replace(area=area, pct=pct))
+                if (area, pct) == (25_000, 0.90):
+                    joint.to_csv(w.catalogue_file(2003, tag), index=False)
+                    save(w.labels_file(2003, tag), [7] * 8, range(8))
+                else:
+                    ref.to_csv(w.catalogue_file(2003, tag), index=False)
+                    save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, range(8))
         table = AY.paper_table(2003, w)
-        written = w.robustness / "catalogue_sensitivity_europe_2003.csv"
-        assert written.exists(), written
-    assert list(table.columns) == ["min_area_km2", "percentile", "n_events",
-                                   "ref_rank", "survives", "rank", "start", "end",
-                                   "duration_days", "peak_area_km2",
-                                   "severity_C_km2_day"], list(table.columns)
-    assert len(table) == 2 * 6, len(table)       # 2 events x 6 settings, window 15 only
+        assert (w.robustness / "catalogue_sensitivity_europe_2003.csv").exists()
+    assert len(table) == 2 * 6, len(table)
     merged = table[(table.min_area_km2 == 25_000) & (table.percentile == 0.90)]
-    assert list(merged["rank"]) == [1, 1], merged   # two references, one new event
+    assert list(merged["rank"]) == [1, 1], merged
     assert merged.survives.all()
 
 
-def test_one_at_a_time():
-    """Tags, the settings list, and one sweep value that moves the leader."""
-    import tempfile
-    import numpy as np
-    # Three days keeps the grid's file names; any other count is marked.
-    assert AY.tag_for(50_000, 0.90, 15) == "_a50k_p90_w15"
-    assert AY.tag_for(50_000, 0.90, 15, 3) == "_a50k_p90_w15"
-    assert AY.tag_for(50_000, 0.90, 15, 5) == "_a50k_p90_w15_d5"
-    assert AY.tag_for(50_000, 0.90, 21, 3, True) == "_a50k_p90_w21_sc"
-    settings = AY.one_at_a_time_settings()
-    assert len(settings) == 4 + 5 + 5 + 5, len(settings)
-    assert ("min_days", 6, (50_000, 0.90, 15, 6, False)) in settings
-    assert ("window_days", 21, (50_000, 0.90, 21, 3, False)) in settings
-    # Same window, cycle removed: a different setting, never the reference.
-    assert ("window_cycle_removed", 15, (50_000, 0.90, 15, 3, True)) in settings
-
-    shape = np.array([10, 5, 5])
-    cols = ["rank", "event_id", "severity_C_km2_day"]
-
-    def save(path, ids, cells):
-        t, i, j = np.unravel_index(np.asarray(cells, dtype=int), tuple(shape))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(path, t=t, i=i, j=j,
-                            event_id=np.asarray(ids, dtype=np.int32), shape=shape)
-
-    with tempfile.TemporaryDirectory() as d:
-        w = Workdir(Path(d))
-        w.catalogues.mkdir(parents=True)
-        ref = pd.DataFrame([[1, 1, 9e7], [2, 2, 5e7]], columns=cols)
-        swapped = pd.DataFrame([[1, 2, 6e7], [2, 1, 4e7]], columns=cols)
-        for param, value, setting in settings:
-            tag = AY.tag_for(*setting)
-            cat = swapped if (param, value) == ("min_days", 7) else ref
-            cat.to_csv(w.catalogue_file(2003, tag), index=False)
-            save(w.labels_file(2003, tag), [1] * 5 + [2] * 3, list(range(8)))
-        table = AY.compare_one_at_a_time(2003, w, top=6)
-    moved = table[table.leader_moved]
-    assert list(zip(moved.parameter, moved.value)) == [("min_days", 7)], moved
-    assert table.is_reference.sum() == 3      # once per raw sweep, never with the cycle removed
-    assert not table.top3_left_top.any() and not table.top_merged.any()
-
-
 if __name__ == "__main__":
-    test_one_at_a_time()
     test_leave_one_out()
     test_threshold_name()
+    test_default_tag()
     test_names_never_collide()
-    test_empty_setting()
+    test_settings_and_tags()
+    test_crowding()
+    test_compare_year()
     test_restart_skips_finished_settings()
     test_paper_table()
-    test_changed_parameter()
-    test_crowding()
     print("ok")

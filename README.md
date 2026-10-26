@@ -30,11 +30,18 @@ hwcat robustness --years 2003               # every setting, and what moves
   disk are skipped, so an interrupted download resumes.
 - `detect` writes the catalogue to `hwcat-data/catalogues/` and a map to
   `hwcat-data/maps/`. `--leave-one-out` judges a summer inside 1991-2020
-  against the other 29 years, so it never helps set its own threshold.
-- `robustness` reruns the detector under 18 settings (minimum area 25,000,
-  50,000 or 100,000 km²; 90th or 95th percentile; 7-, 15- or 31-day window),
-  matches every event across them by the grid cells and days they share, and
+  against the other 29 years, so it never helps set its own threshold. The
+  window removes the seasonal cycle before taking percentiles (Brunner and
+  Voigt 2024; `--raw-window` for the old pooling), and a European run keeps
+  only European countries (`--whole-box` for all land in the box).
+- `robustness` changes one setting at a time from the reference (minimum
+  area 25,000 to 625,000 km²; 90th to 97.5th percentile; 7- to 31-day window,
+  with and without the seasonal cycle; 3 to 6 days; 6, 10 or 26 space-time
+  neighbours) plus a percentile x minimum-days grid, matches every event
+  across them by the grid cells and days they share, records whether the
+  leader held, was replaced, absorbed another top event or split, and
   writes a per-summer summary to `hwcat-data/robustness/`.
+  `python -m hwcat.review` adds intervals and the reviewer checks.
 
 ## Another region
 

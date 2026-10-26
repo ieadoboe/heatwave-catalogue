@@ -61,13 +61,14 @@ def threshold_name(region: str, first: int, last: int, pct: float, span: str,
 
 
 def default_tag(window: int, first: int, last: int,
-                baseline_years: list[int], remove_cycle: bool = False) -> str:
-    """Output suffix for a run with no --tag, so a non-default window, a
-    removed seasonal cycle or a leave-one-out baseline never overwrites the
-    reference catalogue."""
+                baseline_years: list[int], remove_cycle: bool = True) -> str:
+    """Output suffix for a run with no --tag, so a non-default window, raw
+    pooling or a leave-one-out baseline never overwrites the reference
+    catalogue. The seasonal cycle is removed by default (Brunner and Voigt
+    2024), so it is raw pooling that gets marked."""
     tag = f"_w{window}" if window != 15 else ""
-    if remove_cycle:
-        tag += "_sc"
+    if not remove_cycle:
+        tag += "_raw"
     if len(baseline_years) < last - first + 1:
         tag += "_loo"
     return tag
@@ -106,13 +107,39 @@ def download_hint(workdir: Workdir, years: str) -> str:
     return hint
 
 
+REF_THRESHOLD = (0.90, 15, True)   # percentile, window, cycle removed
+
+
+def domain_mask(lat: np.ndarray, lon: np.ndarray, land: np.ndarray,
+                region: str) -> np.ndarray:
+    """Land cells in the region's own countries (Europe: Natural Earth's
+    European countries plus Cyprus), so a "European" catalogue holds no
+    North African or Anatolian events. Regions without a country grid keep
+    all land in the box."""
+    from hwcat import viewer
+    if region not in viewer.HOME:
+        return land
+    grid, _, home = viewer.country_grid(lat, lon, land, region)
+    return land & np.asarray(home)[grid]
+
+
 def run(year: int, workdir: Workdir, percentile: float = 0.90,
         min_days: int = 3, min_area: float = 50_000.0, window: int = 15,
         leave_one_out: bool = False, save_labels: bool = False,
         plot: bool = True, season: tuple[str, str] = ("05-01", "09-30"),
         baseline: tuple[int, int] = (1991, 2020), tag: str | None = None,
-        rebuild_threshold: bool = False, remove_cycle: bool = False) -> Path:
-    """Catalogue one year under one setting; return the event CSV path."""
+        rebuild_threshold: bool = False, remove_cycle: bool = True,
+        connectivity: int = 10, whole_box: bool = False,
+        rescore: bool = False) -> Path:
+    """Catalogue one year under one setting; return the event CSV path.
+
+    whole_box keeps every land cell in the box instead of the region's own
+    countries. rescore adds two severities computed the same way for every
+    setting, so rankings can be compared without the metric itself moving:
+    severity_ref_C_km2_day, the exceedance above the REF_THRESHOLD bar, and
+    severity_norm_km2_day, the exceedance above this run's own bar divided
+    by the local interquartile range of daily maxima (from the REF_THRESHOLD
+    window), as in Russo's HWMId."""
     if window < 1 or window % 2 == 0:
         raise ValueError(f"window must be odd and positive, got {window}: a "
                          f"window centred on the target day has as many days "
@@ -133,30 +160,51 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
     months = target["time"].dt.month
     span = f"m{int(months.min()):02d}-{int(months.max()):02d}"
     workdir.thresholds.mkdir(parents=True, exist_ok=True)
-    thresh_path = workdir.thresholds / threshold_name(
-        workdir.region, first, last, percentile, span, window, baseline_years,
-        remove_cycle)
-    if thresh_path.exists() and not rebuild_threshold:
-        threshold = xr.open_dataarray(thresh_path).load()
-    else:
-        paths = [workdir.era5_file(y) for y in baseline_years]
-        missing = [p.name for p in paths if not p.exists()]
-        if missing:
-            raise FileNotFoundError(
-                f"missing {len(missing)} baseline year(s): "
-                f"{', '.join(missing[:5])}\n"
-                f"run: {download_hint(workdir, f'{first}-{last}')}")
-        baseline_da = D.open_daily_tmax(paths)
-        threshold = D.calendar_day_percentile(baseline_da, q=percentile,
-                                              window=window // 2,
-                                              remove_cycle=remove_cycle)
-        replace_atomically(threshold.to_netcdf, thresh_path)
-        del baseline_da
+    baseline_da = None
 
-    land = D.land_mask_for(target["latitude"].values, target["longitude"].values)
-    det = D.detect(target, threshold, land_mask=land, min_days=min_days,
-                   min_area_km2=min_area)
-    events = D.event_table(det, target, min_area_km2=min_area)
+    def threshold_for(pct, win, cycle):
+        nonlocal baseline_da
+        path = workdir.thresholds / threshold_name(
+            workdir.region, first, last, pct, span, win, baseline_years, cycle)
+        if path.exists() and not rebuild_threshold:
+            return xr.open_dataarray(path).load()
+        if baseline_da is None:
+            paths = [workdir.era5_file(y) for y in baseline_years]
+            missing = [p.name for p in paths if not p.exists()]
+            if missing:
+                raise FileNotFoundError(
+                    f"missing {len(missing)} baseline year(s): "
+                    f"{', '.join(missing[:5])}\n"
+                    f"run: {download_hint(workdir, f'{first}-{last}')}")
+            baseline_da = D.open_daily_tmax(paths)
+        out = D.calendar_day_percentile(baseline_da, q=pct, window=win // 2,
+                                        remove_cycle=cycle)
+        replace_atomically(out.to_netcdf, path)
+        return out
+
+    threshold = threshold_for(percentile, window, remove_cycle)
+
+    lat, lon = target["latitude"].values, target["longitude"].values
+    land = D.land_mask_for(lat, lon)
+    domain = land if whole_box else domain_mask(lat, lon, land, workdir.region)
+    det = D.detect(target, threshold, land_mask=domain, min_days=min_days,
+                   min_area_km2=min_area, connectivity=connectivity,
+                   cut=D.cut_cells(land, domain))
+    extra = None
+    if rescore:
+        def on_days(da):
+            return da.sel(dayofyear=target["time"].dt.dayofyear).values
+        ref_pct, ref_win, ref_cycle = REF_THRESHOLD
+        ref_bar = on_days(threshold_for(ref_pct, ref_win, ref_cycle))
+        iqr = (on_days(threshold_for(0.75, ref_win, ref_cycle))
+               - on_days(threshold_for(0.25, ref_win, ref_cycle)))
+        extra = {"severity_ref_C_km2_day":
+                     np.clip(target.values - ref_bar, 0.0, None),
+                 "severity_norm_km2_day":
+                     det.anomaly / np.maximum(iqr, 0.1)}
+    del baseline_da
+    events = D.event_table(det, target, min_area_km2=min_area,
+                           extra_severity=extra)
     events = D.in_season(events, *season)
 
     tag = default_tag(window, first, last, baseline_years,

@@ -146,4 +146,61 @@ assert raw - truth > 0.8, (raw, truth)
 assert abs(fixed - truth) < 0.2, (fixed, truth)
 print(f"OK: on a 0.2 C/day ramp the 31-day bar overshoots by {raw - truth:.2f} C "
       f"raw and misses by {fixed - truth:+.2f} C with the cycle removed.")
+
+# --- connectivity -----------------------------------------------------------
+# On a clean mask, so background exceedances cannot bridge. P (days 0-2)
+# and Q (days 3-5) touch only diagonally in space and time: 26 neighbours
+# join them, 10 and 6 do not. R and S share an edge-free corner within one
+# day: 10 and 26 join them, 6 does not.
+from scipy import ndimage
+m = np.zeros((6, 10, 10), dtype=bool)
+m[0:3, 0:3, 0:3] = True                   # P
+m[3:6, 3:6, 3:6] = True                   # Q: corner (2,2,2)-(3,3,3)
+n_ev = {k: ndimage.label(m, structure=D._connectivity(k))[1]
+        for k in D.CONNECTIVITY}
+assert n_ev == {6: 2, 10: 2, 26: 1}, n_ev
+m2 = np.zeros((1, 6, 6), dtype=bool)
+m2[0, 0:2, 0:2] = True                    # R
+m2[0, 2:4, 2:4] = True                    # S, diagonal neighbour of R
+n_ev = {k: ndimage.label(m2, structure=D._connectivity(k))[1]
+        for k in D.CONNECTIVITY}
+assert n_ev == {6: 2, 10: 1, 26: 1}, n_ev
+print("OK: 26 neighbours join diagonal space-time contact, 6 also "
+      "splits diagonal contact within a day.")
+
+# --- edge flag and rescored severities --------------------------------------
+# The southern blob A sits against the domain's south edge (rows 60:78 of
+# 80 do not reach it), so cut a ring of excluded land just below it.
+domain = np.ones((LAT.size, LON.size), dtype=bool)
+land = domain.copy()
+domain[78:, :] = False                    # excluded land, like Turkey
+cut = D.cut_cells(land, domain)
+assert cut[77, 5] and not cut[40, 60] and cut[0, 60], "cut ring wrong"
+det5 = D.detect(target, thr, land_mask=domain, min_days=3,
+                min_area_km2=50_000.0, cut=cut)
+ones = np.ones_like(det5.anomaly)
+ev5 = D.event_table(det5, target, min_area_km2=50_000.0,
+                    extra_severity={"cell_area_days": ones})
+a5 = ev5[ev5.centroid_lat < 50].iloc[0]
+b5 = ev5[ev5.centroid_lat > 50].iloc[0]
+assert a5.touches_edge and not b5.touches_edge, ev5.touches_edge.tolist()
+# Summing ones times area gives the event's total area x days.
+lab = det5.labels == int(a5.event_id)
+assert abs(a5.cell_area_days - float((lab * det5.area[None]).sum())) < 1.0
+print("OK: an event against excluded land is flagged touches_edge, and an "
+      "extra severity column sums its array over the event.")
+
+# --- order of operations ------------------------------------------------------
+# A cell is hot for 3 days, but its patch is large only on the first two.
+# The area filter runs first, so the cell keeps only 2 large-patch days and
+# the persistence rule then drops it: persistence means 3 days inside a
+# large patch, not 3 hot days.
+order = np.zeros((NDAY, LAT.size, LON.size), dtype="float32")
+order[40:42, 10:30, 10:50] += 12.0         # big patch, days 40-41
+order[42, 15:17, 20:22] += 12.0            # a 2x2 remnant on day 42
+tgt6 = make_year(2026, extra=order)
+det6 = D.detect(tgt6, thr, min_days=3, min_area_km2=50_000.0)
+assert not det6.mask[40:43, 10:30, 10:50].any(), "2 large days survived"
+print("OK: persistence counts days inside a large patch, after the area "
+      "filter.")
 print("\nALL CHECKS PASSED")

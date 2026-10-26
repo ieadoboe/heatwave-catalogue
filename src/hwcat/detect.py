@@ -19,6 +19,13 @@ exceedances are everywhere, and labelling straight away lets them bridge
 unrelated blobs together. Each day is therefore filtered for spatial extent
 first, which is what `min_area_km2` controls.
 
+The order in `detect` is: land (and region) mask, the per-day area filter,
+then the per-cell persistence rule, then labelling. Persistence comes after
+the area filter, so a cell-day counts only if the cell sat inside a large
+patch on at least `min_days` consecutive days. The opening can then trim a
+day's patch below `min_area_km2`, so single days of an event may be smaller
+than the minimum; the event as a whole still reaches it on its largest day.
+
 Everything here is plain numpy and scipy on in-memory arrays. Europe at 0.25
 degrees for April to October is about 150 x 280 x 214, which is small.
 """
@@ -184,7 +191,7 @@ def sustained(mask: np.ndarray, min_days: int = 3) -> np.ndarray:
 
 
 def spatially_coherent(mask: np.ndarray, area: np.ndarray,
-                       min_area_km2: float) -> np.ndarray:
+                       min_area_km2: float, rook: bool = False) -> np.ndarray:
     """Day by day, drop connected patches smaller than `min_area_km2`.
 
     This has to happen BEFORE the space-time labelling, not after. At the 90th
@@ -195,7 +202,8 @@ def spatially_coherent(mask: np.ndarray, area: np.ndarray,
     testing, a planted 5-day event came back as 12 days. Requiring each day to
     be spatially extensive first removes the bridges."""
     out = np.zeros_like(mask)
-    structure = ndimage.generate_binary_structure(2, 2)   # 8-connectivity
+    # 8-connectivity, or 4 (rook) to match 6-neighbour labelling.
+    structure = ndimage.generate_binary_structure(2, 1 if rook else 2)
     for t in range(mask.shape[0]):
         labels, n = ndimage.label(mask[t], structure=structure)
         if n == 0:
@@ -207,17 +215,41 @@ def spatially_coherent(mask: np.ndarray, area: np.ndarray,
     return out
 
 
-def _connectivity() -> np.ndarray:
-    """Neighbourhood for labelling: all 8 spatial neighbours within a day,
-    and the same cell on the previous and next day.
+CONNECTIVITY = (6, 10, 26)
 
-    Full 26-neighbour connectivity would also join cells that are diagonal in
-    space AND time, which merges events that only brush past one another."""
+
+def _connectivity(kind: int = 10) -> np.ndarray:
+    """Neighbourhood for space-time labelling.
+
+    10 (the default): all 8 spatial neighbours within a day, and the same
+    cell on the previous and next day.
+    6: the 4 edge neighbours within a day, and the same cell on the
+    previous and next day.
+    26: every cell of the 3x3x3 block, so cells diagonal in space AND time
+    join, which merges events that only brush past one another."""
+    if kind == 26:
+        return np.ones((3, 3, 3), dtype=bool)
+    if kind == 6:
+        return ndimage.generate_binary_structure(3, 1)
+    if kind != 10:
+        raise ValueError(f"connectivity must be one of {CONNECTIVITY}, got {kind}")
     structure = np.zeros((3, 3, 3), dtype=bool)
     structure[1] = True
     structure[0, 1, 1] = True
     structure[2, 1, 1] = True
     return structure
+
+
+def cut_cells(land: np.ndarray, domain: np.ndarray) -> np.ndarray:
+    """Cells where an event can be cut off in space: the outer ring of the
+    box, and domain cells next to land the region mask leaves out (Turkey
+    for Europe, the United States for Canada)."""
+    edge = np.zeros_like(domain)
+    edge[[0, -1], :] = True
+    edge[:, [0, -1]] = True
+    outside = land & ~domain
+    near = ndimage.binary_dilation(outside, structure=np.ones((3, 3), bool))
+    return domain & (edge | near)
 
 
 @dataclass
@@ -231,16 +263,19 @@ class Detection:
     lat: np.ndarray
     lon: np.ndarray
     area: np.ndarray              # (lat, lon) km^2
+    cut: np.ndarray | None = None  # (lat, lon) cells where space cuts events
 
 
 def detect(target: xr.DataArray, threshold: xr.DataArray,
            land_mask: np.ndarray | None = None,
-           min_days: int = 3, min_area_km2: float = 50_000.0) -> Detection:
-    """Threshold, require spatial coherence, require persistence, then label.
+           min_days: int = 3, min_area_km2: float = 50_000.0,
+           connectivity: int = 10, cut: np.ndarray | None = None) -> Detection:
+    """Mask, require spatial coherence, require persistence, then label.
 
     The order is deliberate. Filtering scattered exceedances out of each day
     first stops them bridging separate events together during the space-time
-    labelling; see `spatially_coherent`."""
+    labelling; see `spatially_coherent`. `cut` marks cells where the domain
+    cuts events off (see `cut_cells`), for the edge flag in `event_table`."""
     exc = exceedance(target, threshold)
     thresh = threshold.sel(dayofyear=target["time"].dt.dayofyear).values
     anomaly = (target.values - thresh).astype("float32")
@@ -250,29 +285,42 @@ def detect(target: xr.DataArray, threshold: xr.DataArray,
     if land_mask is not None:
         mask &= land_mask[None, :, :]
     if min_area_km2:
-        mask = spatially_coherent(mask, area, min_area_km2)
+        mask = spatially_coherent(mask, area, min_area_km2,
+                                  rook=connectivity == 6)
     mask = sustained(mask, min_days=min_days)
 
-    labels, n = ndimage.label(mask, structure=_connectivity())
+    labels, n = ndimage.label(mask, structure=_connectivity(connectivity))
     return Detection(
         labels=labels, n_events=int(n), mask=mask, anomaly=anomaly,
         time=pd.DatetimeIndex(target["time"].values),
         lat=target["latitude"].values, lon=target["longitude"].values,
-        area=area,
+        area=area, cut=cut,
     )
 
 
 def event_table(det: Detection, target: xr.DataArray,
-                min_area_km2: float = 50_000.0) -> pd.DataFrame:
+                min_area_km2: float = 50_000.0,
+                extra_severity: dict[str, np.ndarray] | None = None
+                ) -> pd.DataFrame:
     """One row per event, ranked by severity.
 
     severity_C_km2_day is the area-weighted sum of the exceedance anomaly over
-    every cell-day in the event. It is the gridded analogue of Russo's heat
-    wave magnitude: an event scores highly by being hot, large and long, so a
-    brief national record and a mild continental month are not conflated.
+    every cell-day in the event: an event scores highly by being hot, large
+    and long. It is in degrees C, not normalized by local variability as
+    Russo's HWMI and HWMId are, so it weighs regions and months with a wide
+    spread of daily maxima more heavily.
 
-    Events smaller than min_area_km2 at their largest are dropped; without
-    that the table fills with single-cell specks on coastlines and mountains.
+    extra_severity maps a column name to a (time, lat, lon) array; each adds
+    a column summing that array times cell area over the event's cell-days.
+    catalogue.run uses it for severity above a fixed reference threshold and
+    for a normalized severity, so a ranking can be redone by either.
+
+    Events smaller than min_area_km2 at their largest are dropped. Every
+    surviving daily patch already passed the area filter, so this only
+    removes events the persistence rule trimmed below the minimum.
+
+    touches_edge is True when the event reaches a cell where the domain cuts
+    it off in space (det.cut), so its true extent is unknown.
     """
     tmax = target.values
     rows = []
@@ -296,6 +344,12 @@ def event_table(det: Detection, target: xr.DataArray,
         tmax_in = np.where(sub_labels, sub_tmax, np.nan)
         severity = float(np.nansum(np.where(sub_labels, sub_anom, 0.0)
                                    * sub_area[None, :, :]))
+        extra = {col: round(float(np.nansum(np.where(sub_labels, arr[sl], 0.0)
+                                            * sub_area[None, :, :])), 2)
+                 for col, arr in (extra_severity or {}).items()}
+        cut = det.cut[sl[1], sl[2]] if det.cut is not None else None
+        touches_edge = bool((sub_labels & cut[None]).any()) if cut is not None \
+            else False
 
         # Peak day: the largest area-weighted mean anomaly, which is the day
         # the event was most intense rather than merely most widespread.
@@ -337,7 +391,9 @@ def event_table(det: Detection, target: xr.DataArray,
             "peak_day_anom_lon": round(float(lon_sub[most_unusual[1]]), 2),
             "mean_anom_C": round(float(np.nanmean(anom_in)), 2),
             "severity_C_km2_day": round(severity),
+            **extra,
             "n_cell_days": int(sub_labels.sum()),
+            "touches_edge": touches_edge,
             # True when the event touches the first or last day of the data,
             # so its real start or end lies outside what was downloaded.
             "censored_start": sl[0].start == 0,

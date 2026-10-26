@@ -57,8 +57,19 @@ def main(argv: list[str] | None = None) -> None:
     t.add_argument("--min-area", type=float, default=50_000.0)
     t.add_argument("--window", type=int, default=15)
     t.add_argument("--leave-one-out", action="store_true")
+    t.add_argument("--raw-window", action="store_true",
+                   help="Pool the window raw instead of subtracting each "
+                        "day's normal first (the default since 2026-10-26)")
     t.add_argument("--remove-seasonal-cycle", action="store_true",
-                   help="Subtract each day's normal before taking percentiles")
+                   help="Kept for old scripts; this is now the default")
+    t.add_argument("--connectivity", type=int, default=10, choices=(6, 10, 26),
+                   help="Space-time neighbours for labelling (default 10)")
+    t.add_argument("--whole-box", action="store_true",
+                   help="Keep all land in the box, not only the region's "
+                        "own countries")
+    t.add_argument("--rescore", action="store_true",
+                   help="Add severities against the reference bar and "
+                        "normalized by local spread")
     t.add_argument("--save-labels", action="store_true")
     t.add_argument("--no-plot", action="store_true")
     t.add_argument("--tag", default=None)
@@ -68,9 +79,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--years", nargs="+", required=True)
     r.add_argument("--top", type=int, default=6)
     r.add_argument("--jobs", type=int, default=3)
-    r.add_argument("--one-at-a-time", action="store_true",
-                   help="Sweep each setting across its full range, the "
-                        "others at the reference, instead of the grid")
+    r.add_argument("--skip-runs", action="store_true",
+                   help="Only compare catalogues already on disk")
 
     a = parser.parse_args(argv)
     wd = Workdir(a.workdir, region=a.region_name)
@@ -88,10 +98,11 @@ def main(argv: list[str] | None = None) -> None:
                 min_area=a.min_area, window=a.window,
                 leave_one_out=a.leave_one_out, save_labels=a.save_labels,
                 plot=not a.no_plot, tag=a.tag,
-                remove_cycle=a.remove_seasonal_cycle)
+                remove_cycle=not a.raw_window, connectivity=a.connectivity,
+                whole_box=a.whole_box, rescore=a.rescore)
         else:
-            from hwcat.robustness import one_at_a_time, sweep
-            run = one_at_a_time if a.one_at_a_time else sweep
-            run(parse_years(a.years), wd, top=a.top, jobs=a.jobs)
+            from hwcat.robustness import sweep
+            sweep(parse_years(a.years), wd, top=a.top, jobs=a.jobs,
+                  skip_runs=a.skip_runs)
     except (ValueError, FileNotFoundError) as e:
         sys.exit(f"hwcat {a.command}: {e}")

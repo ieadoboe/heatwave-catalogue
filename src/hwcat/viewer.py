@@ -2,8 +2,8 @@
 
     python -m hwcat.viewer --workdir hwcat-data
 
-Packs every robustness run (year x area x percentile x window) that has both
-an event CSV and a label file into <workdir>/viewer/heatwave_viewer.html. The
+Packs every robustness run (year x area x percentile x window, seasonal
+cycle removed as in the reference) that has both an event CSV and a label file into <workdir>/viewer/heatwave_viewer.html. The
 page needs no server: each run's footprints are gzipped into the page and
 unpacked in the browser only when that run is picked.
 """
@@ -101,7 +101,7 @@ def build(workdir: Workdir) -> Path:
             f"heatwave_events_{workdir.region}_*.csv")):
         year = int(csv.stem.split("_")[3])
         for area, pct, win in product(AREAS_KM2, PERCENTILES, WINDOWS):
-            tag = tag_for(area, pct, win)
+            tag = tag_for(area, pct, win, remove_cycle=True)
             if csv.name != workdir.catalogue_file(year, tag).name:
                 continue
             npz = workdir.labels_file(year, tag)
