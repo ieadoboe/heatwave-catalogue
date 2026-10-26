@@ -44,8 +44,10 @@ def macros(results: Path) -> dict[str, str]:
                           ("moved_connectivity", "NMovedConnectivity"),
                           ("moved_window_raw", "NMovedRawWindow"),
                           ("moved_grid", "NMovedGrid")):
-            if col in s:
-                out[name] = str(int(s[col].sum()))
+            for sfx, tail in (("", ""), ("_severity_ref", "RefBar"),
+                              ("_severity_norm", "Norm")):
+                if col + sfx in s and not name.endswith(("RefBar", "Norm")):
+                    out[name + tail] = str(int(s[col + sfx].sum()))
         if "leader_peak_month" in s:
             jja = s.leader_peak_month.isin([6, 7, 8])
             out["NLeaderJJA"] = str(int(jja.sum()))

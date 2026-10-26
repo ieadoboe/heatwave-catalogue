@@ -150,6 +150,8 @@ def test_compare_year():
     # By the reference bar the 95th no longer moves it; only the vanishing does.
     assert summary["n_settings_moving_leader"] == 2, summary
     assert summary["n_settings_moving_leader_severity_ref"] == 1, summary
+    assert not summary["moved_percentile_severity_ref"], summary
+    assert summary["moved_percentile_severity_norm"] is not None
     assert summary["leader_absorbed"] and not summary["leader_split"]
     assert summary["top_pair_merged"]
     assert abs(summary["lead"] - (1 - 5 / 9)) < 1e-9

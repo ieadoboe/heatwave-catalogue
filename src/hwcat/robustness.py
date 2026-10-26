@@ -267,11 +267,14 @@ def compare_year(year: int, workdir: Workdir, top: int = 6
             sfx = "" if metric == "severity" else f"_{metric}"
             summary[f"leader_moved{sfx}"] = bool((single & moved).any())
             summary[f"n_settings_moving_leader{sfx}"] = int((single & moved).sum())
+        for metric in metrics:
+            sfx = "" if metric == "severity" else f"_{metric}"
+            t = table.metric == metric
+            for family in (*SINGLE, "window_raw", "grid"):
+                summary[f"moved_{family}{sfx}"] = bool(
+                    (t & (table.family == family) & moved).any())
         t = (table.metric == "severity")
         single = t & table.family.isin(SINGLE)
-        for family in (*SINGLE, "window_raw", "grid"):
-            summary[f"moved_{family}"] = bool((t & (table.family == family)
-                                               & moved).any())
         summary["leader_absorbed"] = bool((single & (table.leader == "absorbed")).any())
         summary["leader_split"] = bool((single & (table.leader == "split")).any())
         summary["top3_left_top"] = bool((single & table.top3_left_top).any())

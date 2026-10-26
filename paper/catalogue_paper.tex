@@ -102,17 +102,22 @@ the largest heat waves in climate projections. None of these studies reports
 whether the event a catalogue ranks first stays first when the detector's
 own settings change, nor what makes a summer's ranking fragile.
 
-This paper asks that question for 36 European summers, 1991--2026. We build a
+This paper asks that question for 36 European summers, 1991--2026, and
+uses the answer to build a catalogue whose ranking is stable. We build a
 gridded CTX90pct catalogue from ERA5 for each summer under a reference
 configuration, rerun it with each setting changed in turn across the range
 used in the literature, and record what happens to the leading event: whether
-it holds, is overtaken, absorbs another leading event, or breaks up. We
-separate changes in which events are detected from changes in how they are
-scored, test whether a summer's instability can be predicted from how far its
-leader is ahead, and repeat the experiment for Canada to test that prediction
-in a second region. Section~\ref{sec:methods} describes the data, the
+it holds, is overtaken, absorbs another leading event, or breaks up. We then
+trace the instability to its sources (the way the threshold window is
+pooled, the bar against which each run is scored, and the measure of
+severity) and test whether a catalogue built to avoid them keeps its leader:
+the seasonal cycle removed before the percentile is taken, European land
+only, and events ranked by severity normalized by local variability. For
+the instability that remains, we test whether it can be predicted from how
+far a summer's leader is ahead, and repeat the experiment for Canada to test
+that prediction in a second region. Section~\ref{sec:methods} describes the data, the
 detector and the experiment; section~\ref{sec:results} presents the results;
-section~\ref{sec:discussion} considers what they imply for case selection;
+section~\ref{sec:discussion} considers what they imply for building and using catalogues;
 and section~\ref{sec:conclusions} summarizes.
 
 \section{Data and methods}
@@ -236,7 +241,10 @@ neighbours \citep{Zhang2025}. Because percentile and minimum duration are the
 settings most likely to move the leader, they were also crossed in a
 $4 \times 4$ grid. The 7-, 15- and 31-day windows were rerun once more with
 raw pooling, which
-measures the bias the reference avoids rather than a defensible choice.
+measures the bias the reference avoids rather than a defensible choice. We
+call the reference configuration ranked by $S_{\mathrm{norm}}$ the recipe: it
+removes the seasonal cycle, keeps European land only and normalizes severity,
+the three choices section~\ref{sec:results} tests.
 
 \subsection{Matching and outcomes}
 \label{sec:matching}
@@ -311,43 +319,51 @@ severity is \LeadTwentySix{}\% below the leader's.
 %% TODO: describe the 2026 leading events (dates, extent, location) from
 %% the new catalogue, and the 2003 and 2022 leaders as worked examples.
 
-\subsection{How often the leader moves}
+\subsection{Three sources of instability}
 \label{sec:sens}
 
-A single change of setting moved the leader in \NLeaderMoved{} of
-\NSummers{} summers (95\% interval \LeaderMovedLo{}--\LeaderMovedHi{}\%). By
-setting, the percentile moved it in \NMovedPercentile{}, the minimum duration
-in \NMovedDays{}, the minimum area in \NMovedArea{}, the window in
-\NMovedWindow{} and the connectivity in \NMovedConnectivity{} summers; the
-$4 \times 4$ percentile and duration grid, which includes those single
-changes, moved it in \NMovedGrid{}. With raw pooling the
-window moved it in \NMovedRawWindow{}. The leader absorbed another leading
+Three properties of a conventional catalogue can move its leader without any
+change in the heat itself. Pooling the threshold window raw: the raw 7-, 15-
+and 31-day windows moved the leader in \NMovedRawWindow{} summers, against
+\NMovedWindow{} for the same windows with the seasonal cycle removed. Scoring
+each run against its own bar: ranked by severity above each run's own
+threshold, a single change of setting moved the leader in \NLeaderMoved{} of
+\NSummers{} summers (95\% interval \LeaderMovedLo{}--\LeaderMovedHi{}\%), and
+ranked by severity above the fixed reference threshold in
+\NLeaderMovedRefBar{}. Ranking by raw degrees: ranked by normalized severity,
+the leader moved in \NLeaderMovedNorm{}.
+%% TODO: interpret each contrast, and the null model (review_settings.csv):
+%% which settings move leaders beyond reshuffled near-ties.
+
+\subsection{How stable the recipe is}
+\label{sec:metric}
+
+Under the recipe, the seasonal cycle removed, European land only and events
+ranked by normalized severity, a single change of setting moved the leader in
+\NLeaderMovedNorm{} of \NSummers{} summers. By setting, the percentile moved it
+in \NMovedPercentileNorm{}, the minimum duration in \NMovedDaysNorm{}, the
+minimum area in \NMovedAreaNorm{}, the window in \NMovedWindowNorm{} and the
+connectivity in \NMovedConnectivityNorm{} summers; the $4 \times 4$
+percentile and duration grid, which includes those single changes, moved it
+in \NMovedGridNorm{}. For comparison, ranked by raw severity the same changes
+moved it in \NMovedPercentile{}, \NMovedDays{}, \NMovedArea{},
+\NMovedWindow{} and \NMovedConnectivity{} summers, and the grid in
+\NMovedGrid{}. Ranked by raw severity, the leader absorbed another leading
 event under some single change in \NLeaderAbsorbed{} summers and broke up in
 \NLeaderSplit{}, and one of the three most severe events left the top six in
 \NTopThreeLeft{}.
-%% TODO: per-setting comparison with the null model (review_settings.csv):
-%% which settings move leaders beyond reshuffled near-ties.
+%% TODO: interpret. Which settings still move the recipe's leader, and
+%% whether the remaining moves are near-ties.
 
-\subsection{Detection or scoring}
-\label{sec:metric}
-
-Ranked by severity above the fixed reference threshold, the leader moved in
-\NLeaderMovedRefBar{} summers;
-ranked by normalized severity, the leader under that ranking moved in
-\NLeaderMovedNorm{}.
-%% TODO: interpret. If the reference-bar count is much lower, most moves at
-%% higher percentiles come from rescoring rather than from which events are
-%% detected. If the normalized count is much lower, raw severity drives the
-%% instability.
-
-\subsection{Which summers are fragile}
+\subsection{Which summers remain fragile}
 \label{sec:predict}
 
 The number of single changes that move a summer's leader has a Spearman
 correlation of $\rho = \RhoLead{}$ ($p = \PLead{}$) with the leader's lead
 and of $\rho = \RhoCrowding{}$ ($p = \PCrowding{}$) with the crowding of the
 leading events.
-%% TODO: interpret once the numbers exist.
+%% TODO: interpret once the numbers exist, and decide whether to fit the
+%% rule on the recipe's ranking rather than on raw severity.
 Leaders peaking in June
 to August moved in \SeasonK{} of \SeasonN{} summers and the others in
 \SeasonKRest{} of \SeasonNRest{} ($p = \PSeason{}$); summers inside the
