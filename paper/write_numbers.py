@@ -73,7 +73,10 @@ def macros(results: Path) -> dict[str, str]:
     r = read("review_lead_rule.csv")
     if r is not None:
         r = r.iloc[0]
-        out["LeadEvenOdds"] = pct(r.lead_at_even_odds)
+        # "More likely than not below X" only reads right if a smaller lead
+        # means more moves, i.e. a negative slope.
+        if r.slope < 0:
+            out["LeadEvenOdds"] = pct(r.lead_at_even_odds)
         out["AUCFit"] = f"{r.auc_fit:.2f}"
         if "auc_validate" in r and pd.notna(r.auc_validate):
             out["AUCValidate"] = f"{r.auc_validate:.2f}"

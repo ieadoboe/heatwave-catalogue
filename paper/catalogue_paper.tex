@@ -136,7 +136,8 @@ Ocean cells were removed with a land mask from the 0.1$^\circ$
 K\"oppen-Geiger map of \citet{Beck2023}, sampled to the ERA5 grid by nearest
 neighbour. Land outside Europe was then removed as well: a cell is kept if
 the nearest 0.1$^\circ$ cell lies in a country that Natural Earth assigns to
-Europe, or in Cyprus. The box otherwise reaches North Africa, Anatolia and
+Europe, or in Cyprus; a coastal land cell whose centre falls outside every
+country outline takes the nearest country. The box otherwise reaches North Africa, Anatolia and
 the Middle East, which would let events there lead a European catalogue. An
 event that reaches the outer ring of the box, or a cell next to excluded
 land, is flagged as cut off in space, since its true extent is unknown.
@@ -156,11 +157,13 @@ normals, which widens the sample and biases the percentile where the
 seasonal cycle is steep \citep{BrunnerVoigt2024}. We therefore first
 subtracted from each baseline day its own normal, a 31-day running mean
 across all baseline years, took the percentile of the residuals within the
-window, and added the normal of day $d$ back.
+window, and added the normal of day $d$ back. Calendar days are taken as
+day of year.
 
 Each summer inside the baseline was judged against the other 29 years, so
-that it never helps set its own threshold; each threshold then rests on
-$29 \times 15 = 435$ samples. Summers after 2020 use all 30 years.
+that it never helps set its own threshold; each threshold from 8 April to
+24 October then rests on $29 \times 15 = 435$ samples, and those nearer the
+ends of the retrieved span on fewer. Summers after 2020 use all 30 years.
 
 \subsection{Detection}
 \label{sec:coherence}
@@ -171,7 +174,8 @@ on any day. Labelling that field directly lets isolated cells bridge
 unrelated patches and chain them into one object. The detector therefore
 works in four steps, in this order. First, hot cell-days are those above
 their threshold, on retained land. Second, within each day hot cells are
-grouped into patches under eight-connectivity, and every patch smaller than
+grouped into patches under eight-connectivity (four-connectivity in the
+6-neighbour runs of section~\ref{sec:sensitivity}), and every patch smaller than
 $A_{\min}$ is discarded, with areas from the spherical cell areas
 \begin{equation}
 A(i) = R^2 \, \Delta\phi \, \Delta\lambda \, \cos\phi_i ,
@@ -204,14 +208,16 @@ variability, so it weighs regions and months with a wide spread of daily
 maxima more heavily; it is closest to the extremity index of
 \citet{LhotkaKysely2022}.
 
-Two further rankings are computed for every run. $S_{\mathrm{ref}}$ sums the
-exceedance above the reference threshold instead of the run's own, so a
-stricter percentile changes which cells count but not how they are scored.
-$S_{\mathrm{norm}}$ divides each cell-day's exceedance by the local
-interquartile range of baseline daily maxima in the reference window, in the
-spirit of \citet{Russo2015}. For each event we also recorded its dates,
+Two further rankings are computed for every run. $S_{\mathrm{ref}}$ sums,
+over the run's cell-days, the exceedance above the reference threshold,
+floored at zero, instead of the run's own, so a stricter percentile changes
+which cells count but not how they are scored. $S_{\mathrm{norm}}$ divides
+each cell-day's exceedance by the local interquartile range of baseline
+daily-maximum anomalies (seasonal cycle removed) in the 15-day reference
+window, floored at 0.1$^\circ$C, in the spirit of \citet{Russo2015}. For each event we also recorded its dates,
 peak and mean daily areas, highest daily maximum, largest exceedance, peak
-day (the day of greatest mean exceedance), the area-weighted centroid on that
+day (the day of greatest mean exceedance over the event's cells), the
+area-weighted centroid on that
 day, and whether it is cut off in time (it touches the first or last day
 retrieved) or in space (section~\ref{sec:data}).
 
@@ -228,7 +234,8 @@ last the threshold of \citet{LhotkaKysely2022}; the minimum duration at 3 to
 6 days, as in \citet{Mandonnet2026}; and labelling with 6, 10 or 26
 neighbours \citep{Zhang2025}. Because percentile and minimum duration are the
 settings most likely to move the leader, they were also crossed in a
-$4 \times 4$ grid. The windows were rerun once more with raw pooling, which
+$4 \times 4$ grid. The 7-, 15- and 31-day windows were rerun once more with
+raw pooling, which
 measures the bias the reference avoids rather than a defensible choice.
 
 \subsection{Matching and outcomes}
@@ -236,7 +243,7 @@ measures the bias the reference avoids rather than a defensible choice.
 
 The labelling numbers components in scan order, so no event identifier
 survives a change of configuration. Every reference event was matched to the
-event of the other run with which it shares the most cell-days, provided that
+catalogued event of the other run with which it shares the most cell-days, provided that
 event holds at least half of the reference event's cell-days. Matching on
 shared cell-days, unlike matching on dates and centroids, cannot mistake a
 small event that vanished for one that merged into a large neighbour.
@@ -246,8 +253,10 @@ The fate of the reference leader under each run is one of five outcomes. It
 reference events matched the same object; it was \emph{absorbed} if it still
 ranks first but another leading event merged into it, so the case is a
 different object; it was \emph{replaced} if its match no longer ranks first;
-it \emph{split} if no single piece holds half its cell-days; and it
-\emph{vanished} if none of its cell-days survives. A summer's leader is said
+it \emph{split} if it overlaps two or more events of the run,
+none holding half its cell-days; and it \emph{vanished} otherwise, that is,
+if none of its cell-days survives in a catalogued event or the only piece
+that does holds less than half. A summer's leader is said
 to move when, under at least one single change of setting, it was replaced or
 vanished. Absorption and splitting are reported separately: they change what
 a case study would analyse without changing which event tops the list.
@@ -258,20 +267,26 @@ a case study would analyse without changing which event tops the list.
 Counts of summers carry 95\% Wilson intervals. Whether a setting moves
 leaders more often than chance is judged against a null model in which the
 setting only adds symmetric noise to the log severity ratio of the first two
-events, with a standard deviation equal to the spread of the changes that
-setting actually produced; the expected number of moves sums, over summers,
+events, Gaussian with a standard deviation equal to that of the changes in
+the log ratio that setting value actually produced, over the summers in which
+both events were matched; the expected number of moves sums, over summers,
 the probability that such noise exceeds that summer's own gap. The lead of a
 summer is $1 - S_2/S_1$ in the reference catalogue. Its association with the
 number of single changes that move the leader, and that of crowding (pairs
 of leading events within three days and $10^\circ$ of each other), are
-Spearman rank correlations against that same outcome. Summers with June to
-August leaders, summers inside the baseline and leaders cut off in space are
+Spearman rank correlations against that same outcome; crowding counts pairs
+among the six leading events whose dates overlap or lie at most three days
+apart and whose centroids lie within $10^\circ$, longitude scaled by the
+cosine of latitude. Summers whose leader peaks in June to August, summers
+inside the baseline and leaders cut off in space are
 compared with the rest by Fisher's exact test. A logistic regression of
 whether the leader moves on the logarithm of the lead was fitted to the
 European summers and evaluated on the Canadian ones by the area under the
-ROC curve and the Brier score against climatology. Finally, for each summer
-we report the share of the plausible runs (single changes and the grid,
-without raw pooling) in which the reference leader still ranks first.
+ROC curve and the Brier score against a constant forecast of the Canadian
+move rate; summers with a lead of zero are left out. Finally, for each summer
+we report the share of the plausible runs (the distinct settings among the
+single changes and the grid, without raw pooling) in which the reference
+leader still ranks first.
 
 \section{Results}
 \label{sec:results}
@@ -291,8 +306,8 @@ concentrated in a few of them: the most severe event accounts for
 \TopOneShareTwentySix{}\% of the summed severity of the season, the three most
 severe for \TopThreeShareTwentySix{}\% and the six most severe for
 \TopSixShareTwentySix{}\%, and \NForEightyTwentySix{} events reach 80\%. The
-median duration is \MedianDurationTwentySix{} days, and the leader is
-\LeadTwentySix{}\% ahead of the second event.
+median duration is \MedianDurationTwentySix{} days, and the second event's
+severity is \LeadTwentySix{}\% below the leader's.
 %% TODO: describe the 2026 leading events (dates, extent, location) from
 %% the new catalogue, and the 2003 and 2022 leaders as worked examples.
 
@@ -304,7 +319,8 @@ A single change of setting moved the leader in \NLeaderMoved{} of
 setting, the percentile moved it in \NMovedPercentile{}, the minimum duration
 in \NMovedDays{}, the minimum area in \NMovedArea{}, the window in
 \NMovedWindow{} and the connectivity in \NMovedConnectivity{} summers; the
-percentile and duration grid moved it in \NMovedGrid{}. With raw pooling the
+$4 \times 4$ percentile and duration grid, which includes those single
+changes, moved it in \NMovedGrid{}. With raw pooling the
 window moved it in \NMovedRawWindow{}. The leader absorbed another leading
 event under some single change in \NLeaderAbsorbed{} summers and broke up in
 \NLeaderSplit{}, and one of the three most severe events left the top six in
@@ -316,7 +332,8 @@ event under some single change in \NLeaderAbsorbed{} summers and broke up in
 \label{sec:metric}
 
 Ranked by severity above the fixed reference threshold, the leader moved in
-\NLeaderMovedRefBar{} summers, and ranked by normalized severity in
+\NLeaderMovedRefBar{} summers;
+ranked by normalized severity, the leader under that ranking moved in
 \NLeaderMovedNorm{}.
 %% TODO: interpret. If the reference-bar count is much lower, most moves at
 %% higher percentiles come from rescoring rather than from which events are

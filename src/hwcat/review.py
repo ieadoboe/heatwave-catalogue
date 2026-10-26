@@ -121,6 +121,12 @@ def agreement(table: pd.DataFrame) -> pd.DataFrame:
     reference leader still number 1 (held or absorbed), and which reference
     rank most often takes its place."""
     t = table[table.family.isin(PLAUSIBLE)]
+    # The grid repeats some single changes (90th with 4-6 days, 3 days with
+    # higher percentiles): count each distinct setting once.
+    setting = [c for c in ("area", "pct", "window", "days", "cycle", "conn")
+               if c in t]
+    if setting:
+        t = t.drop_duplicates(["year", "metric", *setting])
     rows = []
     for (year, metric), g in t.groupby(["year", "metric"]):
         held = g.leader.isin(["held", "absorbed"])

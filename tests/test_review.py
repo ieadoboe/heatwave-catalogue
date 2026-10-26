@@ -73,6 +73,13 @@ def test_agreement():
     assert len(a) == 40 and a.leader_share.between(0, 1).all()
     moved_twice = a[a.leader_share == 0]
     assert (moved_twice.usual_rival == 2).all()
+    # A grid run repeating a single change counts once.
+    t2 = pd.concat([t.assign(pct=0.90, days=3),
+                    t[t.family == "percentile"].assign(family="grid", pct=0.90,
+                                                       days=3)])
+    t2.loc[t2.family == "min_days", "days"] = 4
+    a2 = R.agreement(t2)
+    assert (a2.n_settings == 2).all(), a2.n_settings.unique()
 
 
 def test_lead_rule():
