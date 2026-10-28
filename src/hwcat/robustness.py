@@ -45,16 +45,23 @@ REFERENCE = Setting(50_000, 0.90, 15, 3, True, 10)
 BASELINE = (1991, 2020)
 DATES = ["start", "peak", "end"]
 
-# One setting at a time from the reference. Ranges from published practice:
-# percentile 90-97.5 (Perkins and Alexander 2013 and later), minimum
-# duration 3-6 days (Mandonnet et al. 2026), area up to Lhotka and
-# Kysely's 625,000 km2, windows 7-31 days, and the three usual space-time
-# neighbourhoods.
+# One setting at a time from the reference. Every value lies within the
+# range published for that setting (the published-range standard, decided
+# 28 October 2026: interior points allowed, nothing outside):
+#   percentile   90-95: 90th in Perkins and Alexander 2013 and Zhang et
+#                al. 2025; 90th and 95th in Mandonnet et al. 2026.
+#   window       5-31 days: 5 in the ETCCDI indices (TX90p, WSDI); 15 in
+#                Zhang et al. 2025; 31 in Brunner and Voigt 2024's example.
+#   min. days    3-6: 3 in CTX90pct; 3 to 6 in Mandonnet et al. 2026.
+#   min. area    0 to 1,000,000 km2: both ends in Zhang et al. 2025;
+#                625,000 in Lhotka and Kysely 2022.
+#   neighbours   10, 18, 26: 10 and 26 in Zhang et al. 2025; 18 and 26 in
+#                Mandonnet et al. 2026.
 SWEEPS = {"min_area_km2": ("area", (25_000, 50_000, 100_000, 250_000, 625_000)),
-          "percentile": ("pct", (0.90, 0.925, 0.95, 0.975)),
+          "percentile": ("pct", (0.90, 0.925, 0.95)),
           "window_days": ("window", (7, 11, 15, 21, 31)),
           "min_days": ("days", (3, 4, 5, 6)),
-          "connectivity": ("conn", (6, 10, 26))}
+          "connectivity": ("conn", (10, 18, 26))}
 RAW_WINDOWS = (7, 15, 31)
 GRID = list(product(SWEEPS["percentile"][1], SWEEPS["min_days"][1]))
 # Paper Figure 4: area x percentile at the reference window, three summers.

@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> None:
                         "day's normal first (the default since 2026-10-26)")
     t.add_argument("--remove-seasonal-cycle", action="store_true",
                    help="Kept for old scripts; this is now the default")
-    t.add_argument("--connectivity", type=int, default=10, choices=(6, 10, 26),
+    t.add_argument("--connectivity", type=int, default=10, choices=(6, 10, 18, 26),
                    help="Space-time neighbours for labelling (default 10)")
     t.add_argument("--whole-box", action="store_true",
                    help="Keep all land in the box, not only the region's "

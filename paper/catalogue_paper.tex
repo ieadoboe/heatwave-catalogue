@@ -179,8 +179,7 @@ on any day. Labelling that field directly lets isolated cells bridge
 unrelated patches and chain them into one object. The detector therefore
 works in four steps, in this order. First, hot cell-days are those above
 their threshold, on retained land. Second, within each day hot cells are
-grouped into patches under eight-connectivity (four-connectivity in the
-6-neighbour runs of section~\ref{sec:sensitivity}), and every patch smaller than
+grouped into patches under eight-connectivity, and every patch smaller than
 $A_{\min}$ is discarded, with areas from the spherical cell areas
 \begin{equation}
 A(i) = R^2 \, \Delta\phi \, \Delta\lambda \, \cos\phi_i ,
@@ -232,19 +231,44 @@ retrieved) or in space (section~\ref{sec:data}).
 The reference configuration is the 90th percentile, a 15-day window with the
 seasonal cycle removed, $A_{\min} = 50\,000$ km$^2$, a minimum duration of 3
 days and 10-neighbour labelling. Each summer was rerun with one setting
-changed at a time across the range found in published practice: the
-percentile at 90, 92.5, 95 and 97.5; the window at 7, 11, 15, 21 and 31 days;
-$A_{\min}$ at 25\,000, 50\,000, 100\,000, 250\,000 and 625\,000 km$^2$, the
-last the threshold of \citet{LhotkaKysely2022}; the minimum duration at 3 to
-6 days, as in \citet{Mandonnet2026}; and labelling with 6, 10 or 26
-neighbours \citep{Zhang2025}. Because percentile and minimum duration are the
-settings most likely to move the leader, they were also crossed in a
-$4 \times 4$ grid. The 7-, 15- and 31-day windows were rerun once more with
+changed at a time, every value lying within the range published for that
+setting, interior points included but nothing outside it. The percentile was
+set at 90, 92.5 and 95, spanning the 90th of \citet{PerkinsAlexander2013} and
+\citet{Zhang2025} and the 95th of \citet{Mandonnet2026}; the window at 7, 11,
+15, 21 and 31 days, within the 5 days of the ETCCDI indices \citep{Zhang2011}
+and the 31 of the example in \citet{BrunnerVoigt2024}; $A_{\min}$ at
+25\,000, 50\,000, 100\,000, 250\,000 and 625\,000 km$^2$, within the 0 to
+$10^6$ km$^2$ of \citet{Zhang2025}, the last the threshold of
+\citet{LhotkaKysely2022}; the minimum duration at 3 to 6 days, as in
+\citet{Mandonnet2026}; and labelling with 10, 18 or 26 neighbours, the
+structures used by \citet{Zhang2025} and \citet{Mandonnet2026}. Because the
+percentile and the minimum duration moved the leader most in a preliminary
+run, they were also crossed in a $3 \times 4$ grid. The 7-, 15- and 31-day
+windows were rerun once more with
 raw pooling, which
 measures the bias the reference avoids rather than a defensible choice. We
 call the reference configuration ranked by $S_{\mathrm{norm}}$ the recipe: it
 removes the seasonal cycle, keeps European land only and normalizes severity,
 the three choices section~\ref{sec:results} tests.
+
+\subsection{Which setup agrees most}
+\label{sec:consensus}
+
+Changing one setting at a time around a reference anchors any comparison to
+that reference. To ask which setup agrees most often on a summer's leading
+event without that anchor, we drew 30 setups as a Latin hypercube over the
+same published ranges, each value of each setting used as evenly as 30 draws
+allow, with a fixed random seed so that every summer and both regions use
+the same set, and added the reference as one more candidate. Each setup's
+winner is its first-ranked event. Winners were matched to one another rather
+than to any reference catalogue: two are the same event when they share at
+least half of the smaller one's cell-days. A setup scores in a summer when
+its winner is the strict-majority winner of the other 30 setups, so no setup
+votes on its own score; a summer in which no event wins more than half of
+those votes is a near-tie and is left out of that setup's score. The setup
+with the highest score in Europe was then scored on Canada, which played no
+part in choosing it, and the two regions' scores were compared across all
+candidates by rank correlation.
 
 \subsection{Matching and outcomes}
 \label{sec:matching}

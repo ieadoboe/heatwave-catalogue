@@ -215,20 +215,24 @@ def spatially_coherent(mask: np.ndarray, area: np.ndarray,
     return out
 
 
-CONNECTIVITY = (6, 10, 26)
+CONNECTIVITY = (6, 10, 18, 26)
 
 
 def _connectivity(kind: int = 10) -> np.ndarray:
     """Neighbourhood for space-time labelling.
 
     10 (the default): all 8 spatial neighbours within a day, and the same
-    cell on the previous and next day.
-    6: the 4 edge neighbours within a day, and the same cell on the
-    previous and next day.
+    cell on the previous and next day (Zhang et al. 2025).
+    18: also the 4 edge neighbours on the previous and next day, so a patch
+    that shifts one cell overnight stays joined (Mandonnet et al. 2026).
     26: every cell of the 3x3x3 block, so cells diagonal in space AND time
-    join, which merges events that only brush past one another."""
+    join, which merges events that only brush past one another (both).
+    6: the 4 edge neighbours within a day and the same cell on the next
+    and previous day; below the published range, kept for tests only."""
     if kind == 26:
         return np.ones((3, 3, 3), dtype=bool)
+    if kind == 18:
+        return ndimage.generate_binary_structure(3, 2)
     if kind == 6:
         return ndimage.generate_binary_structure(3, 1)
     if kind != 10:

@@ -59,7 +59,7 @@ def save(path, ids, cells):
 
 def test_evaluate_and_validate():
     """Events A (cells 0-99), B (200-299) and C (400-499). In 2000 every
-    setup ranks A first except the 97.5th-percentile ones, which rank B; in
+    setup ranks A first except the 95th-percentile ones, which rank B; in
     2001 the setups split three ways, so there is no majority."""
     cands = C.candidates()
     years = [2000, 2001]
@@ -69,7 +69,7 @@ def test_evaluate_and_validate():
         for year in years:
             for k, s in enumerate(cands):
                 if year == 2000:
-                    first = 2 if s.pct == 0.975 else 1
+                    first = 2 if s.pct == 0.95 else 1
                 else:
                     first = k % 3 + 1
                 order = [first] + [e for e in (1, 2, 3) if e != first]
@@ -81,11 +81,11 @@ def test_evaluate_and_validate():
         t = C.evaluate(w, years, cands)
     setups, summers = t["setups"], t["summers"]
     assert list(summers.consensus) == [True, False]
-    strict = setups[setups.pct == 0.975]
-    assert (strict.score == 0).all() and (setups[setups.pct != 0.975].score == 1).all()
+    strict = setups[setups.pct == 0.95]
+    assert (strict.score == 0).all() and (setups[setups.pct != 0.95].score == 1).all()
     assert (setups.n_summers <= 2).all()
     lv = t["levels"].set_index(["setting", "value"])["mean"]
-    assert lv[("pct", 0.975)] == 0 and lv[("pct", 0.9)] == 1
+    assert lv[("pct", 0.95)] == 0 and lv[("pct", 0.9)] == 1
     v = C.validate(setups, setups)
     assert (v.score_fit == 1).all() and (v.rank_test == 1).all()
     assert abs(v.spearman_rho.iloc[0] - 1) < 1e-9

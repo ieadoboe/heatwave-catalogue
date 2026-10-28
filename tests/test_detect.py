@@ -158,13 +158,19 @@ m[0:3, 0:3, 0:3] = True                   # P
 m[3:6, 3:6, 3:6] = True                   # Q: corner (2,2,2)-(3,3,3)
 n_ev = {k: ndimage.label(m, structure=D._connectivity(k))[1]
         for k in D.CONNECTIVITY}
-assert n_ev == {6: 2, 10: 2, 26: 1}, n_ev
+assert n_ev == {6: 2, 10: 2, 18: 2, 26: 1}, n_ev
+m3 = np.zeros((2, 6, 6), dtype=bool)
+m3[0, 0:2, 0:2] = True                    # T on day 0
+m3[1, 2:4, 0:2] = True                    # U on day 1, shifted one row: an edge in (time, lat)
+n_ev = {k: ndimage.label(m3, structure=D._connectivity(k))[1]
+        for k in D.CONNECTIVITY}
+assert n_ev == {6: 2, 10: 2, 18: 1, 26: 1}, n_ev
 m2 = np.zeros((1, 6, 6), dtype=bool)
 m2[0, 0:2, 0:2] = True                    # R
 m2[0, 2:4, 2:4] = True                    # S, diagonal neighbour of R
 n_ev = {k: ndimage.label(m2, structure=D._connectivity(k))[1]
         for k in D.CONNECTIVITY}
-assert n_ev == {6: 2, 10: 1, 26: 1}, n_ev
+assert n_ev == {6: 2, 10: 1, 18: 1, 26: 1}, n_ev
 print("OK: 26 neighbours join diagonal space-time contact, 6 also "
       "splits diagonal contact within a day.")
 
