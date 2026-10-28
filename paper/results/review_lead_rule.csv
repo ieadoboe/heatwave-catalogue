@@ -1,0 +1,2 @@
+intercept,slope,n_fit,lead_at_even_odds,auc_fit,n_validate,auc_validate,brier_validate,brier_climatology
+-1.288309017935079,-1.3272804250774901,36,0.3788412029756564,0.75625,36,0.81875,0.1750271948763729,0.2469135802469136

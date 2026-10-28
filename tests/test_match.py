@@ -44,16 +44,32 @@ def test_match_by_overlap():
 
 def test_min_overlap():
     ref, ref_fp = events([1, 2]), fp({1: range(100), 2: range(100, 110)})
-    # Only 40 of event 1's 100 cell-days survive: below a 50% rule it is
-    # unmatched, and with one piece that is a vanishing, not a split.
+    # Only 40 of event 1's 100 cell-days survive, but the run event lies
+    # wholly inside it: it shrank, as under a stricter percentile, so it
+    # still matches.
     run, run_fp = events([7]), fp({7: range(20, 60)})
+    m = S.match_by_overlap(ref, ref_fp, run, run_fp, min_overlap=0.5)
+    assert m.run_index[0] == 0 and m.n_pieces[0] == 1, m
+    assert S.leader_outcome(m, run) == "held"
+
+    # A run event that holds 40 of event 1's cell-days but is mostly
+    # elsewhere (60 more cells outside): event 1 vanished into a neighbour.
+    run, run_fp = events([7]), fp({7: list(range(20, 60)) + list(range(200, 260))})
     m = S.match_by_overlap(ref, ref_fp, run, run_fp, min_overlap=0.5)
     assert m.run_index[0] == -1 and m.n_pieces[0] == 1, m
     assert S.leader_outcome(m, run) == "vanished"
 
-    # Three equal pieces: no piece dominant, so a split.
+    # Three equal pieces wholly inside event 1: the largest is its match,
+    # and n_pieces records the split.
     run = events([4, 5, 6])
     run_fp = fp({4: range(0, 33), 5: range(33, 66), 6: range(66, 100)})
+    m = S.match_by_overlap(ref, ref_fp, run, run_fp, min_overlap=0.5)
+    assert m.run_index[0] >= 0 and m.n_pieces[0] == 3, m
+
+    # Three pieces each mostly outside event 1: a split with no piece its own.
+    run_fp = fp({4: list(range(0, 33)) + list(range(300, 340)),
+                 5: list(range(33, 66)) + list(range(400, 440)),
+                 6: list(range(66, 100)) + list(range(500, 540))})
     m = S.match_by_overlap(ref, ref_fp, run, run_fp, min_overlap=0.5)
     assert m.run_index[0] == -1 and m.n_pieces[0] == 3, m
     assert S.leader_outcome(m, run) == "split"

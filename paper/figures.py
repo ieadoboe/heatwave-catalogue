@@ -355,6 +355,7 @@ for ax, year in zip(axes, SENS_YEARS):
     # two reference events landing on one detected event = a merge
     merged = set()
     for (a, p), g in df.groupby(["min_area_km2", "percentile"]):
+        g = g.dropna(subset=["rank"])          # unmatched events: no rank
         for r in g.loc[g.duplicated("rank", keep=False), "rank"]:
             merged.add((a, p, int(r)))
 
@@ -369,7 +370,7 @@ for ax, year in zip(axes, SENS_YEARS):
                     marker="o", ms=4.2, mec="white", mew=0.6, zorder=3)
         starts.setdefault(ys[0], []).append(k)
         for s, x, y in zip(SETTINGS, XPOS, ys):
-            if (s[0], s[1], int(y)) in merged:
+            if np.isfinite(y) and (s[0], s[1], int(y)) in merged:
                 ax.plot(x, y, marker="o", ms=9, mfc="none", mec="#c1121f",
                         mew=1.1, zorder=5)
 

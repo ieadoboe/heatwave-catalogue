@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-MIN_OVERLAP = 0.5   # share of a reference event's cell-days its match must hold
+MIN_OVERLAP = 0.5   # share of either event's cell-days the pair must hold
 
 
 def footprint(path: Path) -> pd.DataFrame:
@@ -30,10 +30,12 @@ def match_by_overlap(ref: pd.DataFrame, ref_fp: pd.DataFrame,
     it overlaps, so >1 means it split) and merged (another reference event
     has the same match, so the run joined them).
 
-    The best run event counts as the match only if it holds at least
-    `min_overlap` of the reference event's cell-days. Below that the event
-    has either vanished or broken up with no piece dominant, and run_index
-    is -1; n_pieces tells the two apart. Ties go to the lower run event id.
+    The best run event counts as the match only if the shared cell-days are
+    at least `min_overlap` of the reference event's cell-days (it survived or
+    grew) or of the run event's (the run event lies mostly inside it: it
+    shrank, as under a stricter percentile). Below both, the reference event
+    has vanished or broken up with no piece mostly its own, and run_index is
+    -1; n_pieces tells the two apart. Ties go to the lower run event id.
 
     Shared cells, unlike dates and centroids, cannot mistake a vanished
     event for a merged one: a reference event counts as merged only if its
@@ -51,6 +53,7 @@ def match_by_overlap(ref: pd.DataFrame, ref_fp: pd.DataFrame,
             .drop_duplicates("event_id_ref").set_index("event_id_ref"))
     pieces = counts.groupby("event_id_ref").size()
     size = ref_fp.groupby("event_id").size()
+    run_size = run_fp.groupby("event_id").size()
     row_of = pd.Series(np.arange(len(run)), index=run.event_id.to_numpy())
 
     out = pd.DataFrame(index=ref.index)
@@ -58,7 +61,9 @@ def match_by_overlap(ref: pd.DataFrame, ref_fp: pd.DataFrame,
     shared = best.shared.reindex(ids).fillna(0).astype(int).to_numpy()
     share = shared / size.reindex(ids).fillna(1).clip(lower=1).to_numpy()
     run_id = best.event_id_run.reindex(ids).to_numpy()
-    ok = pd.notna(run_id) & (share >= min_overlap) & (shared > 0)
+    inside = shared / run_size.reindex(run_id).fillna(1).clip(lower=1).to_numpy()
+    ok = pd.notna(run_id) & (shared > 0) & ((share >= min_overlap)
+                                             | (inside >= min_overlap))
     out["run_index"] = [int(row_of[r]) if k else -1 for r, k in zip(run_id, ok)]
     out["shared"] = shared
     out["share"] = share.round(4)

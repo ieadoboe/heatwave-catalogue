@@ -1,0 +1,109 @@
+year,metric,in_baseline,n_events,leader_margin,n_settings,leader_moved,leader_moved_by,settings_moving_leader,top3_left_top6
+1991,severity,True,27,0.6308594707401565,5,False,,0,False
+1991,peak exceedance,True,27,0.6308594707401565,5,True,area,1,True
+1991,duration,True,27,0.6308594707401565,5,True,percentile,1,True
+1992,severity,True,21,0.21386973319378755,5,True,percentile,1,False
+1992,peak exceedance,True,21,0.21386973319378755,5,False,,0,False
+1992,duration,True,21,0.21386973319378755,5,False,,0,True
+1993,severity,True,24,0.6171789208287897,5,False,,0,True
+1993,peak exceedance,True,24,0.6171789208287897,5,True,percentile,1,True
+1993,duration,True,24,0.6171789208287897,5,False,,0,False
+1994,severity,True,30,0.1963251165223927,5,True,"percentile,window",2,True
+1994,peak exceedance,True,30,0.1963251165223927,5,True,"area,percentile",2,True
+1994,duration,True,30,0.1963251165223927,5,True,window,1,False
+1995,severity,True,28,0.7337976968672995,5,False,,0,True
+1995,peak exceedance,True,28,0.7337976968672995,5,False,,0,True
+1995,duration,True,28,0.7337976968672995,5,False,,0,True
+1996,severity,True,22,0.1417958996626022,5,False,,0,False
+1996,peak exceedance,True,22,0.1417958996626022,5,True,percentile,1,True
+1996,duration,True,22,0.1417958996626022,5,True,window,1,False
+1997,severity,True,30,0.20302774328464845,5,True,window,1,False
+1997,peak exceedance,True,30,0.20302774328464845,5,False,,0,False
+1997,duration,True,30,0.20302774328464845,5,True,"area,percentile,window",4,False
+1998,severity,True,27,0.587591063144177,5,False,,0,False
+1998,peak exceedance,True,27,0.587591063144177,5,False,,0,False
+1998,duration,True,27,0.587591063144177,5,False,,0,True
+1999,severity,True,37,0.41263275557871315,5,False,,0,False
+1999,peak exceedance,True,37,0.41263275557871315,5,True,"percentile,window",2,False
+1999,duration,True,37,0.41263275557871315,5,True,window,1,True
+2000,severity,True,42,0.6487823312878747,5,True,percentile,1,False
+2000,peak exceedance,True,42,0.6487823312878747,5,True,"percentile,window",3,True
+2000,duration,True,42,0.6487823312878747,5,True,"percentile,window",2,True
+2001,severity,True,33,0.5013697916898865,5,False,,0,False
+2001,peak exceedance,True,33,0.5013697916898865,5,True,"percentile,window",2,True
+2001,duration,True,33,0.5013697916898865,5,False,,0,False
+2002,severity,True,28,0.45278577580039303,5,False,,0,True
+2002,peak exceedance,True,28,0.45278577580039303,5,False,,0,False
+2002,duration,True,28,0.45278577580039303,5,False,,0,True
+2003,severity,True,43,0.04256134502902098,5,False,,0,False
+2003,peak exceedance,True,43,0.04256134502902098,5,True,"area,percentile",2,True
+2003,duration,True,43,0.04256134502902098,5,True,window,1,False
+2004,severity,True,29,0.518213468951026,5,False,,0,False
+2004,peak exceedance,True,29,0.518213468951026,5,False,,0,True
+2004,duration,True,29,0.518213468951026,5,True,"area,percentile",2,False
+2005,severity,True,36,0.44899122301009475,5,True,"area,window",2,False
+2005,peak exceedance,True,36,0.44899122301009475,5,True,window,1,False
+2005,duration,True,36,0.44899122301009475,5,True,"area,percentile,window",3,False
+2006,severity,True,45,0.10694000672667636,5,True,"percentile,window",2,False
+2006,peak exceedance,True,45,0.10694000672667636,5,False,,0,True
+2006,duration,True,45,0.10694000672667636,5,True,"area,percentile,window",3,True
+2007,severity,True,45,0.27379787345283924,5,False,,0,False
+2007,peak exceedance,True,45,0.27379787345283924,5,True,"area,percentile,window",3,True
+2007,duration,True,45,0.27379787345283924,5,True,"area,percentile,window",4,True
+2008,severity,True,29,0.09501628068338253,5,True,window,1,True
+2008,peak exceedance,True,29,0.09501628068338253,5,True,percentile,1,True
+2008,duration,True,29,0.09501628068338253,5,False,,0,False
+2009,severity,True,33,0.14010622011159546,5,True,percentile,1,False
+2009,peak exceedance,True,33,0.14010622011159546,5,True,percentile,1,True
+2009,duration,True,33,0.14010622011159546,5,True,"area,percentile",2,True
+2010,severity,True,29,0.843851593431695,5,False,,0,False
+2010,peak exceedance,True,29,0.843851593431695,5,False,,0,True
+2010,duration,True,29,0.843851593431695,5,False,,0,False
+2011,severity,True,30,0.5174508500884408,5,False,,0,False
+2011,peak exceedance,True,30,0.5174508500884408,5,False,,0,False
+2011,duration,True,30,0.5174508500884408,5,True,"area,percentile",2,False
+2012,severity,True,43,0.31468576810348714,5,False,,0,False
+2012,peak exceedance,True,43,0.31468576810348714,5,True,"area,percentile,window",3,True
+2012,duration,True,43,0.31468576810348714,5,False,,0,True
+2013,severity,True,39,0.555726883834441,5,True,percentile,1,False
+2013,peak exceedance,True,39,0.555726883834441,5,False,,0,False
+2013,duration,True,39,0.555726883834441,5,False,,0,False
+2014,severity,True,36,0.038027438058244045,5,True,window,1,False
+2014,peak exceedance,True,36,0.038027438058244045,5,False,,0,True
+2014,duration,True,36,0.038027438058244045,5,False,,0,True
+2015,severity,True,36,0.1938765483053847,5,False,,0,False
+2015,peak exceedance,True,36,0.1938765483053847,5,False,,0,False
+2015,duration,True,36,0.1938765483053847,5,True,"area,percentile",2,False
+2016,severity,True,39,0.5479494007904689,5,False,,0,False
+2016,peak exceedance,True,39,0.5479494007904689,5,True,percentile,1,True
+2016,duration,True,39,0.5479494007904689,5,False,,0,True
+2017,severity,True,35,0.1252533234526162,5,True,window,1,False
+2017,peak exceedance,True,35,0.1252533234526162,5,True,"area,percentile",2,True
+2017,duration,True,35,0.1252533234526162,5,True,"area,percentile,window",3,False
+2018,severity,True,45,0.09367400514160484,5,True,"percentile,window",2,False
+2018,peak exceedance,True,45,0.09367400514160484,5,False,,0,False
+2018,duration,True,45,0.09367400514160484,5,False,,0,True
+2019,severity,True,44,0.559977444559483,5,True,percentile,1,True
+2019,peak exceedance,True,44,0.559977444559483,5,False,,0,True
+2019,duration,True,44,0.559977444559483,5,True,percentile,1,False
+2020,severity,True,46,0.43739883641211685,5,True,percentile,1,False
+2020,peak exceedance,True,46,0.43739883641211685,5,True,window,1,False
+2020,duration,True,46,0.43739883641211685,5,True,"percentile,window",2,False
+2021,severity,False,51,0.35494590315818464,5,False,,0,False
+2021,peak exceedance,False,51,0.35494590315818464,5,False,,0,True
+2021,duration,False,51,0.35494590315818464,5,True,percentile,1,True
+2022,severity,False,45,0.36806199388313665,5,False,,0,False
+2022,peak exceedance,False,45,0.36806199388313665,5,False,,0,False
+2022,duration,False,45,0.36806199388313665,5,True,percentile,1,False
+2023,severity,False,44,0.4750249572982008,5,False,,0,False
+2023,peak exceedance,False,44,0.4750249572982008,5,False,,0,True
+2023,duration,False,44,0.4750249572982008,5,False,,0,True
+2024,severity,False,37,0.2774408478154474,5,True,percentile,1,False
+2024,peak exceedance,False,37,0.2774408478154474,5,False,,0,False
+2024,duration,False,37,0.2774408478154474,5,True,percentile,1,False
+2025,severity,False,44,0.7161812915005412,5,False,,0,False
+2025,peak exceedance,False,44,0.7161812915005412,5,False,,0,False
+2025,duration,False,44,0.7161812915005412,5,False,,0,True
+2026,severity,False,46,0.42707421066616447,5,False,,0,False
+2026,peak exceedance,False,46,0.42707421066616447,5,False,,0,False
+2026,duration,False,46,0.42707421066616447,5,True,window,1,False
