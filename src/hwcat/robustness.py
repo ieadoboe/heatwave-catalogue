@@ -118,9 +118,11 @@ def per_year_table(workdir: Workdir, year: int) -> Path:
     return workdir.robustness / f"stability_{workdir.region}_{year}.csv"
 
 
-def run_year(year: int, workdir: Workdir, skip_runs: bool = False) -> None:
-    """Every setting for one summer, then drop its leave-one-out thresholds."""
-    todo = {s for _, _, s in settings(year)}
+def run_year(year: int, workdir: Workdir, skip_runs: bool = False,
+             todo: list[Setting] | None = None) -> None:
+    """Every setting (default: settings(year)) for one summer, then drop its
+    leave-one-out thresholds."""
+    todo = set(todo) if todo is not None else {s for _, _, s in settings(year)}
     for s in sorted(todo, key=tag_of):
         tag = tag_of(s)
         if skip_runs or (is_current(workdir.catalogue_file(year, tag))
@@ -141,19 +143,20 @@ def run_year(year: int, workdir: Workdir, skip_runs: bool = False) -> None:
     print(f"{year}: done", flush=True)
 
 
-def run_all(years: list[int], workdir: Workdir, jobs: int) -> None:
+def run_all(years: list[int], workdir: Workdir, jobs: int,
+            todo: list[Setting] | None = None) -> None:
     # Summers outside the baseline share one threshold per setting. Build
     # those with a single summer first, so parallel runs never race to
     # write the same cache file.
     # ponytail: assumes every shared summer has the same month span (part
     # of the cache key), true for the April-October downloads.
-    todo = list(years)
+    setups, todo = todo, list(years)
     shared = [y for y in todo if not BASELINE[0] <= y <= BASELINE[1]]
     if shared:
-        run_year(shared[0], workdir)
+        run_year(shared[0], workdir, todo=setups)
         todo.remove(shared[0])
     with ThreadPoolExecutor(jobs) as pool:
-        list(pool.map(lambda y: run_year(y, workdir), todo))
+        list(pool.map(lambda y: run_year(y, workdir, todo=setups), todo))
 
 
 def metric_rank(cat: pd.DataFrame, col: str) -> np.ndarray:

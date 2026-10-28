@@ -82,6 +82,16 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--skip-runs", action="store_true",
                    help="Only compare catalogues already on disk")
 
+    c = sub.add_parser("consensus", help="Which setup agrees most on the leader")
+    _common(c)
+    c.add_argument("--years", nargs="+", required=True)
+    c.add_argument("--jobs", type=int, default=3)
+    c.add_argument("--skip-runs", action="store_true",
+                   help="Only score catalogues already on disk")
+    c.add_argument("--validate", type=Path, default=None,
+                   help="Another region's working folder, to test the pick on")
+    c.add_argument("--validate-region", default="canada")
+
     a = parser.parse_args(argv)
     wd = Workdir(a.workdir, region=a.region_name)
     try:
@@ -100,6 +110,12 @@ def main(argv: list[str] | None = None) -> None:
                 plot=not a.no_plot, tag=a.tag,
                 remove_cycle=not a.raw_window, connectivity=a.connectivity,
                 whole_box=a.whole_box, rescore=a.rescore)
+        elif a.command == "consensus":
+            from hwcat.consensus import consensus
+            consensus(parse_years(a.years), wd, jobs=a.jobs,
+                      skip_runs=a.skip_runs,
+                      other=(Workdir(a.validate, region=a.validate_region)
+                             if a.validate else None))
         else:
             from hwcat.robustness import sweep
             sweep(parse_years(a.years), wd, top=a.top, jobs=a.jobs,
