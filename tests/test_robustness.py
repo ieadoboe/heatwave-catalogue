@@ -181,7 +181,7 @@ def test_restart_skips_finished_settings():
             for _, _, s in AY.settings(2010):
                 tag = AY.tag_of(s)
                 header = "rank,severity_C_km2_day\n" if s == stale else \
-                    "rank,severity_C_km2_day,touches_edge\n"
+                    "rank,severity_C_km2_day,touches_edge,severity_whole_C_km2_day\n"
                 w.catalogue_file(2010, tag).write_text(header)
                 w.labels_file(2010, tag).write_bytes(b"")
             AY.run_year(2010, w)

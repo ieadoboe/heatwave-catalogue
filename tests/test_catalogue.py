@@ -79,7 +79,8 @@ def test_all_ocean_box_gives_empty_catalogue():
 
 def test_matches_reference_2003():
     """The frozen 2003 run, under the settings it was made with (raw pooling,
-    the whole box), value for value on its own columns; label files exact.
+    the whole box, whole-event severity), value for value on its own
+    columns; label files exact.
     Later versions add columns, such as touches_edge, but must not change
     these."""
     with tempfile.TemporaryDirectory() as d:
@@ -87,7 +88,8 @@ def test_matches_reference_2003():
         w.era5.parent.mkdir(parents=True, exist_ok=True)
         w.era5.symlink_to(ERA5)
         out = C.run(2003, w, leave_one_out=True, save_labels=True, plot=False,
-                    tag="_a50k_p90_w15", remove_cycle=False, whole_box=True)
+                    tag="_a50k_p90_w15", remove_cycle=False, whole_box=True,
+                    score_whole_event=True)
         ref = pd.read_csv(REF / "catalogues" / out.name)
         new = pd.read_csv(out)
         pd.testing.assert_frame_equal(new[ref.columns], ref)

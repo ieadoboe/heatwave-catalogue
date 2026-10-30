@@ -113,12 +113,14 @@ def tag_of(s: Setting) -> str:
 
 
 def is_current(csv: Path) -> bool:
-    """A catalogue written by this version: it carries the rescored
-    severities and the edge flag, so an older run on disk is redone."""
+    """A catalogue written by this version: it carries the whole-event
+    severity, added when severity became season-only (30 October 2026), so
+    an older run on disk is redone."""
     if not csv.exists():
         return False
     header = csv.open().readline()
-    return "touches_edge" in header or header.strip() == "rank,start,peak,end"
+    return ("severity_whole_C_km2_day" in header
+            or header.strip() == "rank,start,peak,end")
 
 
 def per_year_table(workdir: Workdir, year: int) -> Path:

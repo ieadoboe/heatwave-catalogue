@@ -130,7 +130,7 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
         baseline: tuple[int, int] = (1991, 2020), tag: str | None = None,
         rebuild_threshold: bool = False, remove_cycle: bool = True,
         connectivity: int = 10, whole_box: bool = False,
-        rescore: bool = False) -> Path:
+        rescore: bool = False, score_whole_event: bool = False) -> Path:
     """Catalogue one year under one setting; return the event CSV path.
 
     whole_box keeps every land cell in the box instead of the region's own
@@ -139,7 +139,11 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
     severity_ref_C_km2_day, the exceedance above the REF_THRESHOLD bar, and
     severity_norm_km2_day, the exceedance above this run's own bar divided
     by the local interquartile range of daily maxima (from the REF_THRESHOLD
-    window), as in Russo's HWMId."""
+    window), as in Russo's HWMId.
+
+    Severities count only the event's cell-days inside `season`
+    (D.event_table's score_days); score_whole_event counts every day, the
+    behaviour before 30 October 2026."""
     if window < 1 or window % 2 == 0:
         raise ValueError(f"window must be odd and positive, got {window}: a "
                          f"window centred on the target day has as many days "
@@ -203,8 +207,11 @@ def run(year: int, workdir: Workdir, percentile: float = 0.90,
                  "severity_norm_km2_day":
                      det.anomaly / np.maximum(iqr, 0.1)}
     del baseline_da
+    md = det.time.strftime("%m-%d")
+    score_days = None if score_whole_event else \
+        np.asarray((md >= season[0]) & (md <= season[1]))
     events = D.event_table(det, target, min_area_km2=min_area,
-                           extra_severity=extra)
+                           extra_severity=extra, score_days=score_days)
     events = D.in_season(events, *season)
 
     tag = default_tag(window, first, last, baseline_years,

@@ -304,8 +304,8 @@ def detect(target: xr.DataArray, threshold: xr.DataArray,
 
 def event_table(det: Detection, target: xr.DataArray,
                 min_area_km2: float = 50_000.0,
-                extra_severity: dict[str, np.ndarray] | None = None
-                ) -> pd.DataFrame:
+                extra_severity: dict[str, np.ndarray] | None = None,
+                score_days: np.ndarray | None = None) -> pd.DataFrame:
     """One row per event, ranked by severity.
 
     severity_C_km2_day is the area-weighted sum of the exceedance anomaly over
@@ -325,6 +325,14 @@ def event_table(det: Detection, target: xr.DataArray,
 
     touches_edge is True when the event reaches a cell where the domain cuts
     it off in space (det.cut), so its true extent is unknown.
+
+    score_days, a boolean per day of det.time, limits every severity to the
+    event's cell-days on those days (catalogue.run passes the season), so an
+    event reaching into April or October is ranked only by its in-season
+    heat. Its dates, duration and areas stay whole, and
+    severity_whole_C_km2_day keeps the unrestricted sum. Without the limit,
+    events mostly in April or October led six European and five Canadian
+    summers of 1991-2026 (review of 30 October 2026).
     """
     tmax = target.values
     rows = []
@@ -346,9 +354,13 @@ def event_table(det: Detection, target: xr.DataArray,
         times = det.time[sl[0]]
         anom_in = np.where(sub_labels, sub_anom, np.nan)
         tmax_in = np.where(sub_labels, sub_tmax, np.nan)
-        severity = float(np.nansum(np.where(sub_labels, sub_anom, 0.0)
+        scored = sub_labels if score_days is None \
+            else sub_labels & score_days[sl[0]][:, None, None]
+        whole = float(np.nansum(np.where(sub_labels, sub_anom, 0.0)
+                                * sub_area[None, :, :]))
+        severity = float(np.nansum(np.where(scored, sub_anom, 0.0)
                                    * sub_area[None, :, :]))
-        extra = {col: round(float(np.nansum(np.where(sub_labels, arr[sl], 0.0)
+        extra = {col: round(float(np.nansum(np.where(scored, arr[sl], 0.0)
                                             * sub_area[None, :, :])), 2)
                  for col, arr in (extra_severity or {}).items()}
         cut = det.cut[sl[1], sl[2]] if det.cut is not None else None
@@ -396,6 +408,8 @@ def event_table(det: Detection, target: xr.DataArray,
             "mean_anom_C": round(float(np.nanmean(anom_in)), 2),
             "severity_C_km2_day": round(severity),
             **extra,
+            **({} if score_days is None
+               else {"severity_whole_C_km2_day": round(whole)}),
             "n_cell_days": int(sub_labels.sum()),
             "touches_edge": touches_edge,
             # True when the event touches the first or last day of the data,
@@ -419,9 +433,9 @@ def in_season(events: pd.DataFrame, first: str = "05-01",
 
     The data reaches past the season on both sides so that an event already
     under way on 1 May, or still running on 30 September, is measured whole:
-    its start, end, duration and severity all include the days outside the
-    season. Only the decision whether it belongs in the catalogue uses the
-    season."""
+    its start, end, duration and areas include the days outside the season.
+    Its severity counts only the season's days when event_table was given
+    score_days, as catalogue.run does."""
     if events.empty:
         return events
     start = pd.to_datetime(events["start"])

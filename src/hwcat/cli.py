@@ -70,6 +70,9 @@ def main(argv: list[str] | None = None) -> None:
     t.add_argument("--rescore", action="store_true",
                    help="Add severities against the reference bar and "
                         "normalized by local spread")
+    t.add_argument("--score-whole-event", action="store_true",
+                   help="Count an event's days outside May-September in its "
+                        "severity (the behaviour before 2026-10-30)")
     t.add_argument("--save-labels", action="store_true")
     t.add_argument("--no-plot", action="store_true")
     t.add_argument("--tag", default=None)
@@ -109,7 +112,8 @@ def main(argv: list[str] | None = None) -> None:
                 leave_one_out=a.leave_one_out, save_labels=a.save_labels,
                 plot=not a.no_plot, tag=a.tag,
                 remove_cycle=not a.raw_window, connectivity=a.connectivity,
-                whole_box=a.whole_box, rescore=a.rescore)
+                whole_box=a.whole_box, rescore=a.rescore,
+                score_whole_event=a.score_whole_event)
         elif a.command == "consensus":
             from hwcat.consensus import consensus
             consensus(parse_years(a.years), wd, jobs=a.jobs,

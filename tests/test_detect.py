@@ -112,6 +112,17 @@ kept = D.in_season(ev3, "06-01", "08-31")
 assert sorted(kept.start.astype(str)) == ["2026-05-29"], kept.start.tolist()
 k = kept.iloc[0]
 assert k.duration_days == 6 and k["rank"] == 1, (k.duration_days, k["rank"])
+# Scored on the season only, the straddling event keeps its dates but its
+# severity counts 1-3 June, half its uniformly hot days.
+md = pd.DatetimeIndex(tgt3.time.values).strftime("%m-%d")
+in_jja = np.asarray((md >= "06-01") & (md <= "08-31"))
+ev3s = D.event_table(D.detect(tgt3, thr, min_days=3, min_area_km2=50_000.0),
+                     tgt3, min_area_km2=50_000.0, score_days=in_jja)
+s3 = ev3s.set_index(ev3s.start.astype(str)).loc["2026-05-29"]
+assert s3.duration_days == 6, s3.duration_days
+assert s3.severity_whole_C_km2_day == k.severity_C_km2_day
+assert abs(s3.severity_C_km2_day / s3.severity_whole_C_km2_day - 0.5) < 0.05, \
+    s3.severity_C_km2_day / s3.severity_whole_C_km2_day
 print("OK: an event straddling the season start is kept whole (starts "
       "29 May, 6 days),\n    events outside the season are dropped, and "
       "edge events are flagged censored.")
