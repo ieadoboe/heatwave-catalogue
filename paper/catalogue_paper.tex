@@ -102,20 +102,17 @@ the largest heat waves in climate projections. None of these studies reports
 whether the event a catalogue ranks first stays first when the detector's
 own settings change, nor what makes a summer's ranking fragile.
 
-This paper asks that question for 36 European summers, 1991--2026, and
-uses the answer to build a catalogue whose ranking is stable. We build a
-gridded CTX90pct catalogue from ERA5 for each summer under a reference
-configuration, rerun it with each setting changed in turn across the range
-used in the literature, and record what happens to the leading event: whether
-it holds, is overtaken, absorbs another leading event, or breaks up. We then
-trace the instability to its sources (the way the threshold window is
-pooled, the bar against which each run is scored, and the measure of
-severity) and test whether a catalogue built to avoid them keeps its leader:
-the seasonal cycle removed before the percentile is taken, European land
-only, and events ranked by severity normalized by local variability. For
-the instability that remains, we test whether it can be predicted from how
-far a summer's leader is ahead, and repeat the experiment for Canada to test
-that prediction in a second region. Section~\ref{sec:methods} describes the data, the
+This paper asks that question for 36 European warm seasons, 1991--2026,
+and repeats it for Canada as a second region. We build a gridded CTX90pct
+catalogue from ERA5 for each season under a reference configuration, rerun
+it with each setting changed in turn across the range used in the
+literature, and record what happens to the leading event: whether it holds,
+is overtaken, absorbs another leading event, or breaks up. We ask which
+settings move the leader and how far ahead a leader must be to survive them,
+test whether a move can be predicted from that lead in the region the rule
+was not fitted to, and compare a balanced sample of configurations drawn
+across the same ranges to ask whether any configuration agrees more often
+than the reference on which event leads. Section~\ref{sec:methods} describes the data, the
 detector and the experiment; section~\ref{sec:results} presents the results;
 section~\ref{sec:discussion} considers what they imply for building and using catalogues;
 and section~\ref{sec:conclusions} summarizes.
@@ -133,7 +130,10 @@ Store as the derived daily-statistics product. The European box spans
 149 latitudes by 281 longitudes. Each summer was retrieved from 1 April to 31
 October, so that an event already under way on 1 May, or still running on 30
 September, is measured whole; an event enters the catalogue of a summer if at
-least one of its days falls between 1 May and 30 September.
+least one of its days falls between 1 May and 30 September. Its dates,
+duration and areas are those of the whole event, but its severity counts only
+its days between 1 May and 30 September (section~\ref{sec:events}), so that an
+event lying mostly in April or October cannot lead a warm-season catalogue.
 %% TODO: state the retrieval date of each 2026 month and whether it is ERA5T;
 %% rerun 2026 on final ERA5 before submission.
 
@@ -146,6 +146,10 @@ country outline takes the nearest country. The box otherwise reaches North Afric
 the Middle East, which would let events there lead a European catalogue. An
 event that reaches the outer ring of the box, or a cell next to excluded
 land, is flagged as cut off in space, since its true extent is unknown.
+Because a single such cell sets the flag, we also report the share of an
+event's area-days that lie on these cells. The box ends at 45$^\circ$E,
+inside European Russia, so an event there may continue beyond the domain;
+the catalogue does not measure that part.
 
 The second region, Canada, spans 41.5--84$^\circ$N and 141--52$^\circ$W and
 keeps Canadian land only; it was processed identically.
@@ -205,7 +209,10 @@ S = \sum_{(t,i,j)\,\in\,E}
     \left[ T_{\max}(t,i,j) - T_{90}(d_t,i,j) \right] A(i) ,
 \label{eq:severity}
 \end{equation}
-in $^\circ$C km$^2$ day, by which the catalogue is ranked. An event scores
+in $^\circ$C km$^2$ day, by which the catalogue is ranked. The sum runs over
+the event's cell-days between 1 May and 30 September only
+(section~\ref{sec:data}); the sum over all its cell-days is kept for
+comparison. An event scores
 highly by being hot, large and long together. Unlike the heat wave magnitude
 indices of \citet{Russo2014,Russo2015}, $S$ is not normalized by local
 variability, so it weighs regions and months with a wide spread of daily
@@ -246,10 +253,7 @@ percentile and the minimum duration moved the leader most in a preliminary
 run, they were also crossed in a $3 \times 4$ grid. The 7-, 15- and 31-day
 windows were rerun once more with
 raw pooling, which
-measures the bias the reference avoids rather than a defensible choice. We
-call the reference configuration ranked by $S_{\mathrm{norm}}$ the recipe: it
-removes the seasonal cycle, keeps European land only and normalizes severity,
-the three choices section~\ref{sec:results} tests.
+measures the bias the reference avoids rather than a defensible choice.
 
 \subsection{Which setup agrees most}
 \label{sec:consensus}
@@ -275,8 +279,11 @@ candidates by rank correlation.
 
 The labelling numbers components in scan order, so no event identifier
 survives a change of configuration. Every reference event was matched to the
-catalogued event of the other run with which it shares the most cell-days, provided that
-event holds at least half of the reference event's cell-days. Matching on
+catalogued event of the other run with which it shares the most cell-days,
+provided the shared cell-days make up at least half of the reference event's
+cell-days, or at least half of the other event's. The second condition
+matches an event that a stricter setting has shrunk, so that it now lies
+mostly inside the reference event. Matching on
 shared cell-days, unlike matching on dates and centroids, cannot mistake a
 small event that vanished for one that merged into a large neighbour.
 
@@ -285,10 +292,10 @@ The fate of the reference leader under each run is one of five outcomes. It
 reference events matched the same object; it was \emph{absorbed} if it still
 ranks first but another leading event merged into it, so the case is a
 different object; it was \emph{replaced} if its match no longer ranks first;
-it \emph{split} if it overlaps two or more events of the run,
-none holding half its cell-days; and it \emph{vanished} otherwise, that is,
-if none of its cell-days survives in a catalogued event or the only piece
-that does holds less than half. A summer's leader is said
+it \emph{split} if it overlaps two or more events of the run, none of
+which meets either matching condition; and it \emph{vanished} otherwise,
+that is, if none of its cell-days survives in a catalogued event or the only
+piece that does meets neither condition. A summer's leader is said
 to move when, under at least one single change of setting, it was replaced or
 vanished. Absorption and splitting are reported separately: they change what
 a case study would analyse without changing which event tops the list.
@@ -302,7 +309,12 @@ setting only adds symmetric noise to the log severity ratio of the first two
 events, Gaussian with a standard deviation equal to that of the changes in
 the log ratio that setting value actually produced, over the summers in which
 both events were matched; the expected number of moves sums, over summers,
-the probability that such noise exceeds that summer's own gap. The lead of a
+the probability that such noise exceeds that summer's own gap. The null
+model tests for a preference, not for noise: a setting that moves leaders
+more often than the null favours a different kind of event, and one that
+moves them about as often rescales the leading events without favouring
+either. Its $p$ values are adjusted for the number of setting values tested
+by the method of \citet{Holm1979}. The lead of a
 summer is $1 - S_2/S_1$ in the reference catalogue. Its association with the
 number of single changes that move the leader, and that of crowding (pairs
 of leading events within three days and $10^\circ$ of each other), are
@@ -367,7 +379,7 @@ ranked by normalized severity, a single change of setting moved the leader in
 \NLeaderMovedNorm{} of \NSummers{} summers. By setting, the percentile moved it
 in \NMovedPercentileNorm{}, the minimum duration in \NMovedDaysNorm{}, the
 minimum area in \NMovedAreaNorm{}, the window in \NMovedWindowNorm{} and the
-connectivity in \NMovedConnectivityNorm{} summers; the $4 \times 4$
+connectivity in \NMovedConnectivityNorm{} summers; the $3 \times 4$
 percentile and duration grid, which includes those single changes, moved it
 in \NMovedGridNorm{}. For comparison, ranked by raw severity the same changes
 moved it in \NMovedPercentile{}, \NMovedDays{}, \NMovedArea{},
