@@ -26,6 +26,7 @@ Outputs, under <workdir>/robustness/:
   consensus_<region>_setups.csv    one row per candidate
   consensus_<region>_summers.csv   one row per summer
   consensus_<region>_levels.csv    mean score by value of each setting
+  consensus_<region>_versus.csv    the best setup against the reference
   consensus_validation.csv         the European pick, scored on Canada
 """
 
@@ -142,8 +143,21 @@ def evaluate(workdir: Workdir, years: list[int],
     levels = pd.concat([setups.groupby(k).score.agg(["mean", "count"])
                         .reset_index().rename(columns={k: "value"})
                         .assign(setting=k) for k in LEVELS], ignore_index=True)
+    # The best setup against the reference, summer by summer: an exact
+    # McNemar test on the summers where only one of the two agrees.
+    from scipy.stats import binomtest
+    best = int(setups.score.idxmax())
+    ref, top = agree[:, 0], agree[:, best]
+    both = np.isfinite(ref) & np.isfinite(top)
+    top_only = int(((top == 1) & (ref == 0) & both).sum())
+    ref_only = int(((ref == 1) & (top == 0) & both).sum())
+    versus = pd.DataFrame([{**cands[best]._asdict(), "top_only": top_only,
+                            "ref_only": ref_only,
+                            "p": (binomtest(top_only, top_only + ref_only).pvalue
+                                  if top_only + ref_only else 1.0)}])
     return {"setups": setups.sort_values("rank"), "summers": pd.DataFrame(summers),
-            "levels": levels[["setting", "value", "mean", "count"]]}
+            "levels": levels[["setting", "value", "mean", "count"]],
+            "versus": versus}
 
 
 def validate(europe: pd.DataFrame, other: pd.DataFrame) -> pd.DataFrame:

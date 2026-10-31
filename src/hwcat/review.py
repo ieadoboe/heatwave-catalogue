@@ -113,7 +113,45 @@ def null_model(table: pd.DataFrame, n_sim: int = 20_000,
                      "expected_lo": float(np.quantile(sims, 0.025)),
                      "expected_hi": float(np.quantile(sims, 0.975)),
                      "p_at_least": float((sims >= k).mean())})
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    out["p_holm"] = holm(out.p_at_least.to_numpy())
+    return out
+
+
+def holm(p: np.ndarray) -> np.ndarray:
+    """Holm (1979) step-down adjustment for testing every setting value."""
+    order = np.argsort(p)
+    adj = np.empty_like(p, dtype=float)
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, (len(p) - rank) * p[i])
+        adj[i] = min(1.0, running)
+    return adj
+
+
+def is_mild(family: str, value) -> bool:
+    """The milder part of each published range: everything but the strict
+    end of the percentile (95th), duration (6 days) and area (625,000 km2).
+    Raw pooling and the grid are not single, defensible changes."""
+    if family in ("window_days", "connectivity"):
+        return True
+    if family not in ("percentile", "min_days", "min_area_km2"):
+        return False
+    v = float(value)
+    return ((family == "percentile" and v < 0.95)
+            or (family == "min_days" and v < 6)
+            or (family == "min_area_km2" and v < 625_000))
+
+
+def held_all_mild(table: pd.DataFrame) -> dict:
+    """Summers whose leader is never moved by a milder value."""
+    t = table[table.metric == "severity"]
+    mild = t[[is_mild(f, v) for f, v in zip(t.family, t.value)]]
+    moved = mild[mild.leader.isin(MOVED)].year.unique()
+    n = t.year.nunique()
+    k = n - len(moved)
+    lo, hi = wilson(k, n)
+    return {"check": "held_all_mild", "k": k, "n": n, "lo": lo, "hi": hi}
 
 
 def agreement(table: pd.DataFrame) -> pd.DataFrame:
@@ -186,7 +224,10 @@ def load(workdir: Workdir) -> tuple[pd.DataFrame, pd.DataFrame]:
 def review(workdir: Workdir, validate: Workdir | None = None) -> dict:
     summary, table = load(workdir)
     other = load(validate)[0] if validate is not None else None
-    out = {"checks": checks(summary), "settings": null_model(table),
+    out = {"checks": pd.concat([checks(summary),
+                                pd.DataFrame([held_all_mild(table)])],
+                               ignore_index=True),
+           "settings": null_model(table),
            "agreement": agreement(table), "lead_rule": lead_rule(summary, other)}
     for name, df in out.items():
         path = workdir.robustness / f"review_{name}.csv"
