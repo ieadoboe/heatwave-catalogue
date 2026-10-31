@@ -1,0 +1,2 @@
+pct,days,area,window,conn,score_fit,score_test,rank_test,n_candidates,spearman_rho,spearman_p
+0.925,4,50000,11,18,0.9714285714285714,0.8235294117647058,9,31,0.3614941199202369,0.04570000441871686

@@ -26,8 +26,12 @@
 \usepackage{newtxmath}
 \usepackage{graphicx}
 \input{numbers}
+% Marks a claim whose direction the 30 October 2026 rerun could change.
+% Delete each mark once the claim is checked against the new numbers.
+\newcommand{\checkme}{\textsuperscript{\textbf{[check]}}}
 
-\title{TITLE DEFERRED: written last, from the finished results}
+\title{How stable is the leading event of a heat-wave catalogue?
+Detector settings and the top of the European warm-season ranking}
 
 %% AMS designates ONE corresponding author on the title page. The
 %% corresponding author in Editorial Manager can be a different person.
@@ -37,8 +41,33 @@ and Elsa Cardoso-Bihlo}
 \affiliation{Memorial University of Newfoundland, St. John's,
 Newfoundland and Labrador, Canada}
 
-\abstract{ABSTRACT DEFERRED: written last, once the results and conclusions
-are settled.}
+\abstract{Catalogues of heat waves decide which events are studied in
+depth, yet the event a gridded catalogue ranks first depends on detector
+settings that have no physically correct value. We built a CTX90pct
+catalogue from ERA5 daily maximum temperature for each European warm season
+of 1991--2026, and reran it with the percentile, the
+threshold window, the minimum duration, the minimum area and the
+space-time connectivity each changed across the range used in the
+literature. The leading event was overtaken under at least one single
+change in \NLeaderMoved{} of \NSummers{} seasons. The minimum duration is the
+setting the ranking is most sensitive to: four, five and six days moved the
+leader in \NMovedDaysFour{}, \NMovedDaysFive{} and \NMovedStrictDays{}
+seasons. The percentile and the minimum area moved it mainly at the strict
+end of their ranges (the 95th percentile in \NMovedStrictPct{} seasons
+against \NMovedMildPct{} for the 92.5th, and 625\,000\,km$^2$ in
+\NMovedStrictArea{} against \NMovedMildArea{} for 250\,000\,km$^2$).
+Connectivity never moved it, because persistence is required of
+each cell before events are labelled. No setting moved leaders more often
+than a null model of unbiased rescaling once the tests were corrected for
+multiplicity. How far the leader is ahead of the second event predicts a
+move when tested on Canada (area under the ROC curve \AUCValidate{}), and leads of up to \MaxMovedLead{}\% were
+overturned by strict settings. Ranking by severity normalized by local
+variability did not stabilize the ranking. Across a balanced
+sample of \NCandidates{} configurations, none agreed on the leader
+significantly more often than the reference (\PTopVsRef{}). We recommend
+that catalogues report, with each ranking, the leader's lead and whether it
+survives the published range of the minimum duration and the strict end of
+the percentile and area ranges.}
 
 \begin{document}
 
@@ -103,7 +132,8 @@ whether the event a catalogue ranks first stays first when the detector's
 own settings change, nor what makes a summer's ranking fragile.
 
 This paper asks that question for 36 European warm seasons, 1991--2026,
-and repeats it for Canada as a second region. We build a gridded CTX90pct
+and uses Canada only to test whether what is learned in Europe carries
+over. We build a gridded CTX90pct
 catalogue from ERA5 for each season under a reference configuration, rerun
 it with each setting changed in turn across the range used in the
 literature, and record what happens to the leading event: whether it holds,
@@ -355,64 +385,120 @@ severity is \LeadTwentySix{}\% below the leader's.
 %% TODO: describe the 2026 leading events (dates, extent, location) from
 %% the new catalogue, and the 2003 and 2022 leaders as worked examples.
 
-\subsection{Three sources of instability}
+\subsection{How often the leader moves}
 \label{sec:sens}
 
-Three properties of a conventional catalogue can move its leader without any
-change in the heat itself. Pooling the threshold window raw: the raw 7-, 15-
-and 31-day windows moved the leader in \NMovedRawWindow{} summers, against
-\NMovedWindow{} for the same windows with the seasonal cycle removed. Scoring
-each run against its own bar: ranked by severity above each run's own
-threshold, a single change of setting moved the leader in \NLeaderMoved{} of
-\NSummers{} summers (95\% interval \LeaderMovedLo{}--\LeaderMovedHi{}\%), and
-ranked by severity above the fixed reference threshold in
-\NLeaderMovedRefBar{}. Ranking by raw degrees: ranked by normalized severity,
-the leader moved in \NLeaderMovedNorm{}.
-%% TODO: interpret each contrast, and the null model (review_settings.csv):
-%% which settings move leaders beyond reshuffled near-ties.
+Ranked by severity above each run's own threshold, a single change of
+setting overtook or removed the European leader in \NLeaderMoved{} of
+\NSummers{} seasons (95\% interval \LeaderMovedLo{}--\LeaderMovedHi{}\%).
+The minimum duration moves the leader across its whole published range:
+four days moved it in \NMovedDaysFour{} seasons, five days in
+\NMovedDaysFive{} and six days in \NMovedStrictDays{}. The percentile and the
+minimum area move it mainly at the strict end of their ranges: the 92.5th
+percentile moved it in \NMovedMildPct{} seasons and the 95th in
+\NMovedStrictPct{}, and 250\,000\,km$^2$ in \NMovedMildArea{} and
+625\,000\,km$^2$ in \NMovedStrictArea{}. Among the windows with the seasonal
+cycle removed, only the longest, 31 days, moved it in more than three
+seasons (\NMovedWindowLong{}). The leader held under every value short of the
+strict ends (the 92.5th percentile, four or five days, 25\,000 to
+250\,000\,km$^2$, every window and every connectivity) in \NHeldAllMild{}
+seasons. Counted by
+setting, the minimum duration moved the leader in \NMovedDays{} seasons, the
+percentile in \NMovedPercentile{}, the minimum area in \NMovedArea{}, the
+window in \NMovedWindow{} and the connectivity in \NMovedConnectivity{}; the
+$3 \times 4$ percentile and duration grid, which includes those single
+changes, moved it in \NMovedGrid{}.
 
-\subsection{How stable the recipe is}
-\label{sec:metric}
+The same sweep over Canada, used here only as a check, gives a similar
+pattern: a single change moved its leader in \NLeaderMovedCanada{} seasons,
+the minimum duration moved it in \NMovedDaysCanada{}, and the leader held
+under every value short of the strict ends in \NHeldAllMildCanada{}.
 
-Under the recipe, the seasonal cycle removed, European land only and events
-ranked by normalized severity, a single change of setting moved the leader in
-\NLeaderMovedNorm{} of \NSummers{} summers. By setting, the percentile moved it
-in \NMovedPercentileNorm{}, the minimum duration in \NMovedDaysNorm{}, the
-minimum area in \NMovedAreaNorm{}, the window in \NMovedWindowNorm{} and the
-connectivity in \NMovedConnectivityNorm{} summers; the $3 \times 4$
-percentile and duration grid, which includes those single changes, moved it
-in \NMovedGridNorm{}. For comparison, ranked by raw severity the same changes
-moved it in \NMovedPercentile{}, \NMovedDays{}, \NMovedArea{},
-\NMovedWindow{} and \NMovedConnectivity{} summers, and the grid in
-\NMovedGrid{}. Ranked by raw severity, the leader absorbed another leading
-event under some single change in \NLeaderAbsorbed{} summers and broke up in
+Short of moving, the leader absorbed another of the six leading events under
+some single change in \NLeaderAbsorbed{} European seasons and broke up in
 \NLeaderSplit{}, and one of the three most severe events left the top six in
 \NTopThreeLeft{}.
-%% TODO: interpret. Which settings still move the recipe's leader, and
-%% whether the remaining moves are near-ties.
 
-\subsection{Which summers remain fragile}
+\subsection{Connectivity}
+\label{sec:connectivity}
+
+Connectivity moved no leader in either region. The 18- and 26-neighbour
+catalogues are not identical to the reference: they occasionally join an
+extra piece onto an event. They rarely do so because of the order of the
+detector's steps (section~\ref{sec:coherence}). A cell-day survives only if
+the same cell is hot on at least three consecutive days, and each day's hot
+cells are already joined under eight-connectivity. If a hot cell continues
+into the next day, its spatial neighbour on that day is already joined to it
+under 10 neighbours. The diagonal links that 18 and 26 neighbours add can
+join two events only where one cell's run ends on one day and a neighbouring
+cell's run begins on the next. In this detector, connectivity is therefore
+nearly inert by construction; the result does not carry over to detectors
+that label hot cells before requiring persistence.
+
+\subsection{Scoring and threshold choices}
+\label{sec:metric}
+
+Scored against the fixed reference threshold instead of each run's own, the
+European leader moved in \NLeaderMovedRefBar{} seasons, against
+\NLeaderMoved{}. Ranked by severity normalized by local variability, it
+moved in \NLeaderMovedNorm{}: \NNormOnly{} seasons moved only under the
+normalized ranking and \NSevOnly{} only under the raw one
+(\PNormMcNemar{}, exact McNemar test). In Canada the normalized
+ranking moved the leader in \NLeaderMovedNormCanada{} seasons, against
+\NLeaderMovedCanada{} (\PNormMcNemarCanada{}). Normalization
+therefore does not stabilize the ranking. Pooling the threshold window raw
+moved the European leader in \NMovedRawWindow{} seasons across the 7-, 15-
+and 31-day windows, against \NMovedWindow{} across the five windows with the
+seasonal cycle removed.
+
+\subsection{Which seasons are fragile}
 \label{sec:predict}
 
-The number of single changes that move a summer's leader has a Spearman
+The number of single changes that move a season's leader has a Spearman
 correlation of $\rho = \RhoLead{}$ ($p = \PLead{}$) with the leader's lead
 and of $\rho = \RhoCrowding{}$ ($p = \PCrowding{}$) with the crowding of the
-leading events.
-%% TODO: interpret once the numbers exist, and decide whether to fit the
-%% rule on the recipe's ranking rather than on raw severity.
-Leaders peaking in June
-to August moved in \SeasonK{} of \SeasonN{} summers and the others in
-\SeasonKRest{} of \SeasonNRest{} ($p = \PSeason{}$); summers inside the
-baseline moved in \BaselineK{} of \BaselineN{} and later summers in
-\BaselineKRest{} of \BaselineNRest{} ($p = \PBaseline{}$); leaders cut off in
-space moved in \EdgeK{} of \EdgeN{} ($p = \PEdge{}$). Fitted to the European
-summers, a move becomes more likely than not once the lead falls below
-\LeadEvenOdds{}\% (area under the ROC curve \AUCFit{}). Applied unchanged to
-Canada, the rule reaches an area under the curve of \AUCValidate{} and a
-Brier score of \BrierValidate{}, against \BrierClimatology{} for
-climatology. In the median summer the reference leader still ranks first in
-\LeaderShareMedian{}\% of the plausible runs, and in \NLeaderAgreeAll{}
-summers in all of them.
+leading events. A small lead is not the whole story: \NMovedBigLead{} of the
+\NLeaderMoved{} moved seasons had a lead of at least 25\%, up to
+\MaxMovedLead{}\%, and \NStableSmallLead{} seasons with a smaller lead never
+moved. Fitted to the European seasons, a move becomes more likely
+than not once the lead falls below \LeadEvenOdds{}\% (area under the ROC
+curve \AUCFit{}). Applied unchanged to Canada, the rule reaches an area under
+the curve of \AUCValidate{} and a Brier score of \BrierValidate{}, against
+\BrierClimatology{} for a constant forecast.
+
+No setting value moved leaders more often than the null model allows once
+the \NSettingValues{} values tested were corrected for multiplicity
+(\NSettingsAboveNull{} exceed it). The largest excess, \NMovedNullMin{}
+moves against \ExpectedNullMin{} expected, has \PNullMinRaw{} before the
+correction and \PNullMinHolm{} after it. Leaders peaking in June to August
+moved in \SeasonK{} of \SeasonN{} seasons and the others in \SeasonKRest{}
+of \SeasonNRest{} ($p = \PSeason{}$); seasons inside the baseline moved in
+\BaselineK{} of \BaselineN{} and later seasons in \BaselineKRest{} of
+\BaselineNRest{} ($p = \PBaseline{}$). \EdgeN{} European leaders touch a cell
+where the domain cuts events off, but with a median of \EdgeShareMedian{}\%
+of their area-days on such cells and at most \EdgeShareMax{}\%; those
+leaders moved in \EdgeK{} seasons ($p = \PEdge{}$). In the median season the
+reference leader still ranks first in \LeaderShareMedian{}\% of the
+plausible runs, and in \NLeaderAgreeAll{} seasons in all of them.
+
+\subsection{Which configuration agrees most}
+\label{sec:agree}
+
+Among the \NCandidates{} configurations of the balanced sample, the
+reference's leader matched the leader of the majority of the other
+configurations in \RefAgree{} of \RefAgreeOf{} European seasons, rank
+\RefRank{}; the best configuration did so in \TopAgree{} of \TopAgreeOf{}.
+In \NNoConsensus{} seasons no event led a majority. Summer by summer, the
+best configuration agreed where the reference did not in \NTopOnly{} seasons
+and the reverse held in \NRefOnly{} (\PTopVsRef{}, exact McNemar test). The configurations'
+scores in Europe and Canada are correlated (Spearman $\rho =
+\RhoConsensus{}$, \PConsensus{}), and the reference ranks \RefRankCanada{}
+in Canada. Without the configurations that use a 625\,000\,km$^2$ minimum
+area or a six-day minimum, the correlation falls to $\rho =
+\RhoConsensusMild{}$ (\PConsensusMild{}, \NCandidatesMild{}
+configurations). The agreement between the regions therefore
+reflects mainly that the strictest configurations disagree with the rest in
+both, not that any one configuration is better.
 
 \begin{figure}[tbp]
   \centering
@@ -461,16 +547,84 @@ summers in all of them.
 \section{Discussion}
 \label{sec:discussion}
 
-%% TODO. Written third.
+Of the settings a gridded catalogue must fix, the minimum duration matters
+most for which event leads. It moved the European leader at every value
+above the reference's three days, whereas the percentile and the minimum
+area moved it mainly at the strict end of their ranges, and the window and
+connectivity rarely or never. Short of those strict ends, and with the
+duration held to five days or less, the leader held in \NHeldAllMild{} of
+\NSummers{} seasons; the Canadian check shows the same pattern. A plausible
+reason is that severity sums over days, so a longer minimum both removes
+short events and trims the shoulders of long ones, reordering the leading
+events by their persistence rather than their heat. A study that picks its
+case from the top of a catalogue should therefore check that its leader
+survives the published range of the minimum duration, and the strict end of
+the percentile and area ranges, before treating the choice as settled.
+
+The moves are not noise in the sense of chance reshuffling of equal events.
+The null model finds no setting that favours a different kind of event, but
+the strict settings rescale events strongly enough to overturn leads that are
+not close: \NMovedBigLead{} of the moved seasons had leads of 25\% or more.
+The lead remains a useful flag. It ranks seasons by fragility in the region
+the rule was fitted to and nearly as well in the other, but its threshold is
+uncertain and a large lead does not guarantee survival.
+
+Two choices that might be expected to matter did not. Connectivity is
+nearly inert in this detector because persistence is required of each cell
+before labelling (section~\ref{sec:connectivity}); this is a property of the
+order of operations and differs from detectors in which connectivity alters
+heat-wave metrics \citep{Zhang2025}. Normalizing severity by local
+variability, in the spirit of \citet{Russo2015}, did not make the ranking
+more stable. Removing the seasonal cycle before pooling the
+threshold window, as \citet{BrunnerVoigt2024} recommend, moved the leader
+less often across windows than raw pooling, which moved it mostly at the
+longest window.
+
+A balanced sample of configurations does not single out a better one with
+confidence. The best-scoring configuration agreed with the majority in
+\NTopOnly{} seasons where the reference did not, and the reverse happened in
+\NRefOnly{}, a difference short of significance (\PTopVsRef{}). Its
+advantage did not carry over to Canada, and the weak correlation of scores
+between the regions rests on the strictest configurations. We therefore keep
+the reference, chosen for its published provenance, rather than a
+configuration chosen for agreement in one region.
+
+The catalogue has limits that bear on the ranking. CTX90pct is relative to
+the time of year, so events in May and September can lead a warm-season
+catalogue; counting only an event's days between May and September keeps
+events lying mostly in April or October from leading it, but not those
+within the season. Severity in $^\circ$C km$^2$ day favours large events and
+regions with a wide spread of daily maxima, which in Europe favours the
+east. The European box ends at 45$^\circ$E and the Canadian domain at the
+United States border, so events there may be larger than catalogued; the
+leaders touch such cells only marginally, but the part beyond the domain is
+not measured. The results rest on one reanalysis, 36 seasons per region, and
+ERA5 for 2026 is preliminary. Finally, the sweep spans the published range
+of each setting, so its conclusions hold for that range and not beyond it.
 
 \section{Conclusions}
 \label{sec:conclusions}
 
-%% TODO.
+Across 36 European warm seasons, the event a gridded CTX90pct
+catalogue ranks first survives the milder settings published for its
+detector in most seasons. The minimum duration moves it across its whole
+range, and the percentile and minimum area mainly at the strict end of
+theirs. Connectivity does not
+move it in a detector that requires persistence before labelling, and
+normalizing severity does not stabilize it. No configuration in a
+balanced sample agrees on the leader significantly more often than the
+reference. We recommend that a catalogue report, with each ranking, the
+leader's lead over the second event and whether the leader survives the
+range of the minimum duration and the strict end of the other ranges, and
+that studies choosing a case from a catalogue check both.
 
 \datastatement
-%% TODO. AMS requires this section. It needs the Zenodo DOI for the deposited
-%% catalogues, the ERA5 CDS citation, and the code repository.
+ERA5 daily maximum 2-m temperature \citep{Hersbach2020} is available from
+the Copernicus Climate Data Store. The K\"oppen-Geiger map is that of
+\citet{Beck2023}, and country outlines are from Natural Earth. The code that
+builds the catalogues and runs the experiment (\texttt{hwcat}), and the
+catalogues and results tables behind every number in this paper, are
+deposited at Zenodo (DOI to be added before submission).
 
 %% PREVIEW: swap back to ametsocV6 once the AMS files are here.
 \bibliographystyle{plainnat}

@@ -25,6 +25,16 @@ for y in 2003 2022 2026; do
 done
 cp "$WD/robustness/catalogue_stability_allyears.csv" \
    "$WD"/robustness/review_*.csv "$HERE/results/"
+python -m hwcat.review --workdir "$WD/canada" --region-name canada
+hwcat consensus --years 1991-2026 --workdir "$WD" --skip-runs \
+  --validate "$WD/canada" --validate-region canada
+cp "$WD"/robustness/consensus_*.csv "$WD/canada/robustness/consensus_canada_setups.csv" \
+   "$HERE/results/"
+for f in catalogue_stability_allyears review_checks review_settings; do
+  cp "$WD/canada/robustness/$f.csv" "$HERE/results/canada_$f.csv"
+done
+python "$HERE/edge_share.py" "$WD" europe
+python "$HERE/edge_share.py" "$WD/canada" canada
 python "$HERE/write_numbers.py"
 python "$HERE/figures.py" "$WD"
 cd "$HERE" && latexmk -pdf catalogue_paper.tex

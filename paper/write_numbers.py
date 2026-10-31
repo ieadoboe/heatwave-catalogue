@@ -91,6 +91,129 @@ def macros(results: Path) -> dict[str, str]:
         out["NLeaderAgreeAll"] = str(int((sev.leader_share == 1).sum()))
         out["LeaderShareMedian"] = pct(sev.leader_share.median())
 
+    def pfull(x):
+        """$p = 0.03$, or $p < 0.001$: the relation travels with the value."""
+        return r"$p < 0.001$" if x < 0.001 else f"$p = {x:.2g}$"
+
+    def moved_counts(s, tail):
+        # Summers moved under one ranking but not the other, and an exact
+        # McNemar test of the two rankings' move rates.
+        from scipy.stats import binomtest
+        a = s.leader_moved.astype(bool)
+        b = s.leader_moved_severity_norm.astype(bool)
+        n01, n10 = int((~a & b).sum()), int((a & ~b).sum())
+        out[f"NNormOnly{tail}"], out[f"NSevOnly{tail}"] = str(n01), str(n10)
+        if n01 + n10:
+            out[f"PNormMcNemar{tail}"] = pfull(binomtest(n01, n01 + n10).pvalue)
+
+    if s is not None and {"lead", "leader_moved_severity_norm"} <= set(s):
+        moved = s.leader_moved.astype(bool)
+        big = s.lead >= 0.25
+        out["NMovedBigLead"] = str(int((moved & big).sum()))
+        out["NStableSmallLead"] = str(int((~moved & ~big).sum()))
+        out["MaxMovedLead"] = pct(s.lead[moved].max())
+        moved_counts(s, "")
+
+    if c is not None and "held_all_mild" in c.index:
+        out["NHeldAllMild"] = str(int(c.loc["held_all_mild", "k"]))
+
+    v = read("review_settings.csv")
+    if v is not None:
+        row = v.loc[v.p_at_least.idxmin()]
+        out["NMovedNullMin"] = str(int(row.moved))
+        out["ExpectedNullMin"] = f"{row.expected:.0f}"
+        out["PNullMinRaw"] = pfull(row.p_at_least)
+        if "p_holm" in v:
+            out["NSettingsAboveNull"] = str(int((v.p_holm < 0.05).sum()))
+            out["PNullMinHolm"] = pfull(v.p_holm.min())
+        out["NSettingValues"] = str(len(v))
+        # The strict end of each range against the largest count among the
+        # milder values (single changes only).
+        def moved(fam, val):
+            r = v[(v.family == fam)
+                  & (pd.to_numeric(v.value, errors="coerce") == val)]
+            return int(r.moved.iloc[0]) if len(r) else None
+        for name, fam, val in (("NMovedStrictPct", "percentile", 0.95),
+                               ("NMovedStrictArea", "min_area_km2", 625_000),
+                               ("NMovedStrictDays", "min_days", 6),
+                               ("NMovedDaysFour", "min_days", 4),
+                               ("NMovedDaysFive", "min_days", 5),
+                               ("NMovedMildPct", "percentile", 0.925),
+                               ("NMovedMildArea", "min_area_km2", 250_000),
+                               ("NMovedWindowLong", "window_days", 31)):
+            if moved(fam, val) is not None:
+                out[name] = str(moved(fam, val))
+        mild = v[((v.family == "percentile") & (v.value.astype(str) == "0.925"))
+                 | ((v.family == "min_days") & (v.value.astype(str) == "4"))
+                 | ((v.family == "min_area_km2")
+                    & (v.value.astype(str) != "625000"))
+                 | v.family.isin(["window_days", "connectivity"])]
+        if len(mild):
+            out["NMovedMildMax"] = str(int(mild.moved.max()))
+
+    # Canada: the same tables, copied to paper/results/ with a canada_ prefix.
+    k = read("canada_catalogue_stability_allyears.csv")
+    if k is not None:
+        for col, name in (("leader_moved", "NLeaderMovedCanada"),
+                          ("leader_moved_severity_ref", "NLeaderMovedRefBarCanada"),
+                          ("leader_moved_severity_norm", "NLeaderMovedNormCanada"),
+                          ("moved_percentile", "NMovedPercentileCanada"),
+                          ("moved_min_area_km2", "NMovedAreaCanada"),
+                          ("moved_window_days", "NMovedWindowCanada"),
+                          ("moved_min_days", "NMovedDaysCanada"),
+                          ("moved_connectivity", "NMovedConnectivityCanada"),
+                          ("moved_window_raw", "NMovedRawWindowCanada"),
+                          ("moved_grid", "NMovedGridCanada")):
+            if col in k:
+                out[name] = str(int(k[col].sum()))
+        if "leader_moved_severity_norm" in k:
+            moved_counts(k, "Canada")
+    kc = read("canada_review_checks.csv")
+    if kc is not None:
+        kc = kc.set_index("check")
+        if "held_all_mild" in kc.index:
+            out["NHeldAllMildCanada"] = str(int(kc.loc["held_all_mild", "k"]))
+
+    # Share of each leader's area-days on cells where the domain cuts events.
+    for region, tail in (("europe", ""), ("canada", "Canada")):
+        e = read(f"edge_share_{region}.csv")
+        if e is not None:
+            out[f"EdgeShareMedian{tail}"] = f"{e.share_pct.median():.1f}"
+            out[f"EdgeShareMax{tail}"] = f"{e.share_pct.max():.1f}"
+
+    cv = read("consensus_validation.csv")
+    ce = read("consensus_europe_setups.csv")
+    cc = read("consensus_canada_setups.csv")
+    if cv is not None:
+        out["RhoConsensus"] = f"{cv.spearman_rho.iloc[0]:.2f}"
+        out["PConsensus"] = pfull(cv.spearman_p.iloc[0])
+        out["NCandidates"] = str(int(cv.n_candidates.iloc[0]))
+    if ce is not None:
+        ref = ce[ce.is_reference].iloc[0]
+        top = ce.sort_values("score", ascending=False).iloc[0]
+        out["RefAgree"], out["RefAgreeOf"] = str(int(ref.n_agree)), str(int(ref.n_summers))
+        out["RefRank"] = str(int(ref["rank"]))
+        out["TopAgree"], out["TopAgreeOf"] = str(int(top.n_agree)), str(int(top.n_summers))
+    if ce is not None and cc is not None:
+        # The regions' agreement without the strictest values (625,000 km2,
+        # six days), to show how much of it those setups carry.
+        from scipy.stats import spearmanr
+        key = ["area", "pct", "window", "days", "conn"]
+        both = ce.merge(cc, on=key, suffixes=("_e", "_c"))
+        mild = both[(both.area < 625_000) & (both.days < 6)]
+        rho, pv = spearmanr(mild.score_e, mild.score_c)
+        out["RhoConsensusMild"] = f"{rho:.2f}"
+        out["PConsensusMild"] = pfull(pv)
+        out["NCandidatesMild"] = str(len(mild))
+        out["RefRankCanada"] = str(int(cc[cc.is_reference].iloc[0]["rank"]))
+    vs = read("consensus_europe_versus.csv")
+    if vs is not None:
+        out["NTopOnly"], out["NRefOnly"] = str(int(vs.top_only.iloc[0])), str(int(vs.ref_only.iloc[0]))
+        out["PTopVsRef"] = pfull(vs.p.iloc[0])
+    cs = read("consensus_europe_summers.csv")
+    if cs is not None:
+        out["NNoConsensus"] = str(int((~cs.consensus.astype(bool)).sum()))
+
     for year, word in YEAR_WORDS.items():
         e = read(f"heatwave_events_europe_{year}.csv")
         if e is None or e.empty:
