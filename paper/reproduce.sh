@@ -37,4 +37,5 @@ python "$HERE/edge_share.py" "$WD" europe
 python "$HERE/edge_share.py" "$WD/canada" canada
 python "$HERE/write_numbers.py"
 python "$HERE/figures.py" "$WD"
+python "$HERE/detector_figures.py" "$WD"
 cd "$HERE" && latexmk -pdf catalogue_paper.tex

@@ -229,6 +229,23 @@ next day. Because the opening can trim a day's patch, single days of an event
 may fall below $A_{\min}$; an event is retained if its largest day reaches it.
 The reference uses $A_{\min} = 50\,000$ km$^2$, comparable to the area of
 Slovakia.
+Figure~\ref{fig:pipeline} follows the six steps, from the threshold to the
+ranking, through the 2026 season under the reference configuration.
+
+\begin{figure*}[tbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/detector_pipeline}
+  \caption{The detector applied to 2026 under the reference configuration.
+    Top row: the six steps in the order the detector runs them. Middle row:
+    (1) daily maximum temperature $T_{\max}$ at the grid cell of Berlin and
+    its threshold $T_q$, with the leading event shaded; (2--4) the hot cells
+    on 20 June after each step, with cells removed at that step in grey;
+    (5) the footprint of the leading event, coloured by the day each cell
+    joined it; (6) the five most severe events by $S$
+    (eq.~\ref{eq:severity}). Bottom row: the settings of each step, the
+    swept ones in blue and the fixed ones in grey.}
+  \label{fig:pipeline}
+\end{figure*}
 
 \subsection{Severity and attributes}
 \label{sec:events}

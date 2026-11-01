@@ -31,7 +31,7 @@ from matplotlib.transforms import Bbox
 from scipy import ndimage
 
 from hwcat import detect as D
-from hwcat.catalogue import threshold_name
+from hwcat.catalogue import domain_mask, threshold_name
 from hwcat.plots import MPL_CONFIG, mpl_apply
 from hwcat.workdir import Workdir
 
@@ -40,10 +40,13 @@ PLOTS = Path(__file__).resolve().parent / "figures"
 YEAR = 2026
 
 
-def threshold_path() -> Path:
-    """The default threshold (90th, 15-day, 1991-2020) for April-October."""
+def threshold_path(remove_cycle: bool = True) -> Path:
+    """The reference threshold (90th, 15-day, seasonal cycle removed,
+    1991-2020) for April-October. The Berlin step-1 figure recomputes the
+    bar by hand from raw pooled values, so it asks for the raw one."""
     return WORK.thresholds / threshold_name(
-        WORK.region, 1991, 2020, 0.90, "m04-10", 15, list(range(1991, 2021)))
+        WORK.region, 1991, 2020, 0.90, "m04-10", 15, list(range(1991, 2021)),
+        remove_cycle)
 
 
 # ----------------------------------------------------------------------
@@ -97,7 +100,8 @@ def run_detector():
     threshold = xr.open_dataarray(threshold_path()).load()
     lat = target["latitude"].values
     lon = target["longitude"].values
-    land = D.land_mask_for(lat, lon)
+    # The reference keeps only the region's own countries (catalogue.run).
+    land = domain_mask(lat, lon, D.land_mask_for(lat, lon), WORK.region)
     area = D.cell_area_km2(lat, lon)
 
     exc = D.exceedance(target, threshold).values & land[None]
@@ -107,7 +111,11 @@ def run_detector():
     det = D.detect(target, threshold, land_mask=land, min_days=MIN_DAYS,
                    min_area_km2=MIN_AREA)
     assert (det.mask == persistent).all(), "steps no longer match detect()"
-    events = D.in_season(D.event_table(det, target, MIN_AREA))
+    # Severity counts May-September cell-days only, as catalogue.run scores it.
+    md = det.time.strftime("%m-%d")
+    in_season = np.asarray((md >= "05-01") & (md <= "09-30"))
+    events = D.in_season(D.event_table(det, target, MIN_AREA,
+                                       score_days=in_season))
     thresh = threshold.sel(dayofyear=target["time"].dt.dayofyear).values
     return dict(target=target, thresh=thresh, lat=lat, lon=lon, land=land,
                 exc=exc, coherent=coherent, persistent=persistent,
@@ -157,11 +165,11 @@ def pipeline_figure(r):
         ("Threshold",
          r"$T_q$: $q$-quantile of"
          "\n"
-         r"$T_{\max}$, $\pm\lfloor w/2\rfloor$ days"),
+         r"anomalies, $\pm\lfloor w/2\rfloor$ d"),
         ("Exceedance",
          r"$T_{\max} > T_q$"
          "\n"
-         r"on land cells"),
+         r"on European land"),
         ("Area filter",
          r"each day, drop"
          "\n"
@@ -177,17 +185,17 @@ def pipeline_figure(r):
         ("Ranking",
          r"$S=\sum\,(T_{\max}-T_q)\,a_i$"
          "\n"
-         r"over each event"),
+         r"May--Sep cell-days"),
     ]
     settings = [
         [(r"$q = 0.90$", TUNE), (r"$w = 15$ d", TUNE),
          (r"1991--2020", FIXED)],
-        [(r"K\"oppen land mask", FIXED), (r"ERA5, $0.25^\circ$", FIXED)],
+        [(r"European countries", FIXED), (r"ERA5, $0.25^\circ$", FIXED)],
         [(r"$A_{\min} = 5\times10^4$ km$^2$", TUNE),
          (r"8-connectivity", FIXED)],
         [(r"$D_{\min} = 3$ d", TUNE)],
         [(r"8 + 2 neighbours", FIXED), (r"peak area $\ge A_{\min}$", FIXED)],
-        [(r"rank by $S$", FIXED), (r"touches May--Sep", FIXED)],
+        [(r"rank by $S$", FIXED), (r"a day in May--Sep", FIXED)],
     ]
 
     # Inputs above the first two steps.
@@ -389,7 +397,7 @@ def threshold_figure():
     pooled = grid[:, inside].ravel()
     bar = float(np.quantile(pooled, Q))
 
-    cached = xr.open_dataarray(threshold_path()).sel(
+    cached = xr.open_dataarray(threshold_path(remove_cycle=False)).sel(
         dayofyear=target_doy, latitude=CITY[1], longitude=CITY[2],
         method="nearest")
     assert abs(bar - float(cached)) < 0.01, (bar, float(cached))
