@@ -3,7 +3,8 @@
     python paper/figures.py [workdir]        (default workdir: hwcat-data)
 
 Writes paper/figures/*.pdf, then the flat copies the manuscript includes,
-paper/fig1.pdf to fig4.pdf (AMS wants flat names with no underscores). The
+paper/fig2.pdf to fig5.pdf (AMS wants flat names with no underscores; fig1,
+the detector pipeline, comes from detector_figures.py). The
 sections below are the cells of the former figures notebook, in order; they
 share variables, so they run top to bottom.
 """
@@ -525,9 +526,9 @@ print("wrote", PLOTS / "europe_sensitivity_rank_changes.pdf")
 # ----------------------------------------------------------------------
 import shutil  # noqa: E402
 
-for flat, src in {"fig1": f"europe_{YEAR}_fig1b_map_borders.pdf",
-                  "fig2": f"europe_{YEAR}_fig2_timeline.pdf",
-                  "fig3": f"europe_{YEAR}_fig6_footprints.pdf",
-                  "fig4": "europe_sensitivity_rank_changes.pdf"}.items():
+for flat, src in {"fig2": f"europe_{YEAR}_fig1b_map_borders.pdf",
+                  "fig3": f"europe_{YEAR}_fig2_timeline.pdf",
+                  "fig4": f"europe_{YEAR}_fig6_footprints.pdf",
+                  "fig5": "europe_sensitivity_rank_changes.pdf"}.items():
     shutil.copyfile(PLOTS / src, PAPER / f"{flat}.pdf")
-print("wrote paper/fig1.pdf to fig4.pdf")
+print("wrote paper/fig2.pdf to fig5.pdf")

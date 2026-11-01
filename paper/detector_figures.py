@@ -362,6 +362,8 @@ def pipeline_figure(r):
     width, height = fig.get_size_inches()
     crop = Bbox.from_extents(-0.2, (ly - 0.03) * height, width + 0.1, height)
     fig.savefig(PLOTS / "detector_pipeline.pdf", bbox_inches=crop)
+    # The manuscript's Figure 1, as a flat copy (AMS wants flat names).
+    fig.savefig(PLOTS.parent / "fig1.pdf", bbox_inches=crop)
     fig.savefig(PLOTS / "detector_pipeline.png", dpi=300, facecolor="white",
                 bbox_inches=crop)
     print("saved detector_pipeline")
