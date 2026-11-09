@@ -46,18 +46,32 @@ print(f"{len(events)} events, {events.start.min():%d %b} to {events.end.max():%d
 # ----------------------------------------------------------------------
 # detection on the 2026 grid
 # ----------------------------------------------------------------------
-# The threshold the 2026 catalogue was made with (April-October, 15 days,
-# full 1991-2020 baseline). Built once into the working folder if missing.
-target = D.open_daily_tmax([WORKDIR / "era5" / f"europe_tmax_{YEAR}.nc"])
-THRESH = WORKDIR / "thresholds" / "heatwave_threshold_europe_1991_2020_p90_m04-10.nc"
+# The reference run the 2026 events table comes from (catalogue.run with its
+# defaults): 90th percentile, 15-day window with the seasonal cycle removed,
+# 1991-2020 baseline, European countries only. Event ids are scan-order
+# labels, so this must be the same detection or the ids index other blobs.
+from hwcat.catalogue import domain_mask, threshold_name  # noqa: E402
+from hwcat.workdir import Workdir  # noqa: E402
+WORK = Workdir(WORKDIR)
+target = D.open_daily_tmax([WORK.era5_file(YEAR)])
+THRESH = WORK.thresholds / threshold_name(
+    WORK.region, 1991, 2020, 0.90, "m04-10", 15, list(range(1991, 2021)),
+    remove_cycle=True)
 if not THRESH.exists():
     from hwcat.catalogue import run
-    from hwcat.workdir import Workdir
-    run(YEAR, Workdir(WORKDIR), plot=False)
+    run(YEAR, WORK, plot=False)
 thresh = xr.open_dataarray(THRESH).load()
-land = D.land_mask_for(target["latitude"].values, target["longitude"].values)
+land = domain_mask(target["latitude"].values, target["longitude"].values,
+                   D.land_mask_for(target["latitude"].values,
+                                   target["longitude"].values), WORK.region)
 det = D.detect(target, thresh, land_mask=land,
                min_days=3, min_area_km2=50_000.0)
+# Guard: every event in the table must be the same blob in this detection.
+for _, e in events.iterrows():
+    n = int((det.labels == int(e.event_id)).sum())
+    assert n == e.n_cell_days, (
+        f"event {e.event_id}: {n} cell-days here, {e.n_cell_days} in the "
+        f"table; figures.py no longer matches the catalogue run")
 hw_days = (det.labels > 0).sum(axis=0)
 
 print(f"{det.n_events} blobs before the area filter; "

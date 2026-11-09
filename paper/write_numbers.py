@@ -79,6 +79,15 @@ def macros(results: Path) -> dict[str, str]:
         # means more moves, i.e. a negative slope.
         if r.slope < 0:
             out["LeadEvenOdds"] = pct(r.lead_at_even_odds)
+            # The fitted rule as raw counts: seasons either side of the cut,
+            # and how many of each moved.
+            if s is not None:
+                below = s.lead < r.lead_at_even_odds
+                moved = s.leader_moved.astype(bool)
+                out["NLeadBelow"] = str(int(below.sum()))
+                out["NLeadBelowMoved"] = str(int((below & moved).sum()))
+                out["NLeadAbove"] = str(int((~below).sum()))
+                out["NLeadAboveMoved"] = str(int((~below & moved).sum()))
         out["AUCFit"] = f"{r.auc_fit:.2f}"
         if "auc_validate" in r and pd.notna(r.auc_validate):
             out["AUCValidate"] = f"{r.auc_validate:.2f}"
